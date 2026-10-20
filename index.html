@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Perpustakaan Komite Mutu</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0e5a5a">
+<link rel="icon" href="icon-192.png">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<style>
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#f3f6f5;color:#14302f}
+  .btn{background:#0e5a5a;color:#fff;border-radius:.5rem;padding:.55rem 1rem;font-weight:600;font-size:.875rem}
+  .btn:hover{background:#0a4545}.btn:disabled{opacity:.5}
+  .btn2{border:1px solid #b9cfcc;border-radius:.5rem;padding:.35rem .7rem;font-size:.8rem;background:#fff}
+  .btn2:hover{background:#e6f0ee}
+  .in{width:100%;border:1px solid #b9cfcc;border-radius:.5rem;padding:.55rem .75rem;background:#fff}
+  .in:focus,.btn:focus-visible,.btn2:focus-visible{outline:2px solid #c9821a;outline-offset:1px}
+  .nav.on{background:#0e5a5a;color:#fff}
+  label{font-size:.8rem;font-weight:600;display:block;margin-bottom:.25rem}
+</style>
+</head>
+<body>
+<div id="toast" class="fixed top-3 left-1/2 -translate-x-1/2 z-50 space-y-2 w-[92%] max-w-sm"></div>
+
+<!-- LOGIN -->
+<section id="login" class="min-h-screen flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-sm border border-[#d5e3e0] w-full max-w-sm p-6">
+    <h1 class="text-2xl font-bold">Perpustakaan Komite Mutu</h1>
+    <p class="text-sm text-[#4b6866] mb-5">Masuk untuk mengakses dokumen mutu.</p>
+    <div class="space-y-3">
+      <div><label for="lu">Username</label><input id="lu" class="in" autocomplete="username"></div>
+      <div><label for="lp">Password</label><input id="lp" type="password" class="in" autocomplete="current-password"></div>
+      <button id="lb" class="btn w-full">Masuk</button>
+    </div>
+  </div>
+</section>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <header class="bg-[#0e5a5a] text-white">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+      <b class="text-lg">Perpustakaan Komut</b>
+      <div class="text-sm flex items-center gap-3"><span id="who" class="hidden sm:inline"></span>
+        <button id="pw" class="underline">Ganti password</button><button id="out" class="underline">Keluar</button></div>
+    </div>
+  </header>
+  <nav id="nav" class="max-w-5xl mx-auto px-4 py-3 flex gap-2 overflow-x-auto"></nav>
+  <main id="view" class="max-w-5xl mx-auto px-4 pb-16"></main>
+</div>
+
+<script>
+const API = 'https://script.google.com/macros/s/AKfycbz8_ZCTPUz3n7ArquvFUHTVSqhqLLAT0TBUmCFkcLf-7SXOwCHVdn8t8VI1XO3L2qUgvw/exec'; // https://script.google.com/macros/s/XXXX/exec
+const S = { token: sessionStorage.getItem('tk'), user: JSON.parse(sessionStorage.getItem('us') || 'null'), files: [], kat: [], q: '', kf: '', page: 1, tab: 'dash' };
+const $ = id => document.getElementById(id);
+const h = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const tgl = s => s ? String(s).slice(0, 10) : '-';
+const katName = id => (S.kat.find(k => k.id === id) || {}).nama_kategori || '-';
+
+function toast(msg, ok = true) {
+  const d = document.createElement('div');
+  d.className = 'rounded-lg px-4 py-3 text-sm shadow text-white ' + (ok ? 'bg-[#0e5a5a]' : 'bg-[#a63a2b]');
+  d.textContent = msg; $('toast').appendChild(d); setTimeout(() => d.remove(), 4000);
+}
+async function call(action, data = {}) {
+  try {
+    const r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action, token: S.token, ...data }) });
+    const j = await r.json();
+    if (!j.ok) { if (/Sesi berakhir/.test(j.error)) logout(true); throw new Error(j.error); }
+    return j.data;
+  } catch (e) { toast(e.message === 'Failed to fetch' ? 'Tidak ada koneksi. Periksa internet Anda.' : e.message, false); throw e; }
+}
+async function busy(btn, fn) { btn.disabled = true; try { await fn(); } catch (e) {} btn.disabled = false; }
+
+/* ---- Auth ---- */
+$('lb').onclick = () => busy($('lb'), async () => {
+  const r = await call('login', { username: $('lu').value, password: $('lp').value });
+  S.token = r.token; S.user = r.user; sessionStorage.setItem('tk', r.token); sessionStorage.setItem('us', JSON.stringify(r.user));
+  $('lp').value = ''; await start();
+});
+$('lp').onkeydown = e => e.key === 'Enter' && $('lb').click();
+function logout(silent) { if (!silent && S.token) call('logout').catch(() => {}); sessionStorage.clear(); S.token = null; S.user = null; $('app').classList.add('hidden'); $('login').classList.remove('hidden'); }
+$('out').onclick = () => logout();
+async function gantiPw() {
+  const p = prompt('Password baru (minimal 8 karakter):'); if (!p) return;
+  await call('changePassword', { password: p }); S.user.must_change_password = false; toast('Password berhasil diganti');
+}
+$('pw').onclick = gantiPw;
+
+async function start() {
+  $('login').classList.add('hidden'); $('app').classList.remove('hidden');
+  $('who').textContent = S.user.nama_lengkap + ' (' + S.user.role + ')';
+  const adm = S.user.role === 'admin', tulis = adm || S.user.role === 'staf';
+  const tabs = [['dash', 'Dashboard'], ['files', 'Berkas']];
+  if (tulis) tabs.push(['upload', 'Unggah']);
+  if (adm) tabs.push(['kat', 'Kategori'], ['users', 'User'], ['set', 'Pengaturan'], ['audit', 'Audit']);
+  $('nav').innerHTML = tabs.map(t => `<button class="nav btn2 whitespace-nowrap" data-t="${t[0]}">${t[1]}</button>`).join('');
+  $('nav').onclick = e => e.target.dataset.t && go(e.target.dataset.t);
+  await load(); go('dash');
+  if (S.user.must_change_password) { toast('Demi keamanan, ganti password Anda sekarang.', false); gantiPw(); }
+}
+async function load() { const d = await call('data'); S.files = d.files; S.kat = d.kategori; }
+function go(t) {
+  S.tab = t; document.querySelectorAll('.nav').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  ({ dash, files, upload, kat, users, set, audit })[t]();
+}
+
+/* ---- Views ---- */
+function card(t, v) { return `<div class="bg-white rounded-xl border border-[#d5e3e0] p-4"><div class="text-sm text-[#4b6866]">${t}</div><div class="text-3xl font-bold mt-1">${v}</div></div>`; }
+function dash() {
+  const bln = new Date().toISOString().slice(0, 7), baru = [...S.files].sort((a, b) => String(b.tanggal_upload).localeCompare(String(a.tanggal_upload))).slice(0, 5);
+  const batas = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+  const review = S.files.filter(f => f.tanggal_review && tgl(f.tanggal_review) <= batas).sort((a, b) => String(a.tanggal_review).localeCompare(String(b.tanggal_review)));
+  const per = S.kat.map(k => [k.nama_kategori, S.files.filter(f => f.kategori_id === k.id).length]), mx = Math.max(1, ...per.map(p => p[1]));
+  $('view').innerHTML = `
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">${card('Total berkas', S.files.length)}${card('Kategori aktif', S.kat.length)}
+    ${card('Diunggah bulan ini', S.files.filter(f => String(f.tanggal_upload).startsWith(bln)).length)}${card('Perlu direview ≤ 30 hari', review.length)}</div>
+  <div class="flex gap-2 my-4"><button class="btn" onclick="go('files')">Cari dokumen</button>${S.user.role !== 'viewer' ? `<button class="btn" onclick="go('upload')">Unggah berkas</button>` : ''}</div>
+  <div class="grid md:grid-cols-2 gap-3">
+    <div class="bg-white rounded-xl border border-[#d5e3e0] p-4"><h2 class="font-bold mb-2">Dokumen terbaru</h2>${baru.map(f => `<div class="py-1.5 border-t border-[#e3eceb] text-sm">${h(f.nama_file)}<div class="text-xs text-[#4b6866]">${h(katName(f.kategori_id))} · ${tgl(f.tanggal_upload)}</div></div>`).join('') || '<p class="text-sm text-[#4b6866]">Belum ada berkas. Unggah dokumen pertama Anda.</p>'}</div>
+    <div class="bg-white rounded-xl border border-[#d5e3e0] p-4"><h2 class="font-bold mb-2">Berkas per kategori</h2>${per.map(p => `<div class="text-sm mb-2">${h(p[0])} <b>${p[1]}</b><div class="h-2 rounded bg-[#e3eceb]"><div class="h-2 rounded bg-[#0e5a5a]" style="width:${p[1] / mx * 100}%"></div></div></div>`).join('') || '<p class="text-sm text-[#4b6866]">Belum ada kategori.</p>'}</div>
+  </div>
+  ${review.length ? `<div class="bg-white rounded-xl border-l-4 border-[#c9821a] p-4 mt-3"><h2 class="font-bold mb-2">Perlu direview</h2>${review.map(f => `<div class="text-sm py-1">${h(f.nama_file)} — <b>${tgl(f.tanggal_review)}</b></div>`).join('')}</div>` : ''}`;
+}
+
+let deb;
+function files() {
+  $('view').innerHTML = `<div class="flex flex-col sm:flex-row gap-2 mb-3"><input id="sq" class="in" placeholder="Cari judul, nomor, atau deskripsi…" value="${h(S.q)}">
+    <select id="sk" class="in sm:w-56"><option value="">Semua kategori</option>${S.kat.map(k => `<option value="${k.id}" ${S.kf === k.id ? 'selected' : ''}>${h(k.nama_kategori)}</option>`).join('')}</select></div><div id="fl"></div>`;
+  $('sq').oninput = e => { clearTimeout(deb); deb = setTimeout(() => { S.q = e.target.value; S.page = 1; fl(); }, 300); };
+  $('sk').onchange = e => { S.kf = e.target.value; S.page = 1; fl(); }; fl();
+}
+function fl() {
+  const q = S.q.toLowerCase(), u = S.user;
+  const L = S.files.filter(f => (!S.kf || f.kategori_id === S.kf) && (!q || [f.nama_file, f.nomor_dokumen, f.deskripsi].join(' ').toLowerCase().includes(q)));
+  const P = L.slice(0, S.page * 20);
+  $('fl').innerHTML = P.map(f => `<div class="bg-white rounded-xl border border-[#d5e3e0] p-4 mb-2 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+    <div class="min-w-0"><div class="font-semibold break-words">${h(f.nama_file)} <span class="text-xs font-normal text-[#4b6866]">v${h(f.versi)}</span></div>
+    <div class="text-xs text-[#4b6866]">${h(katName(f.kategori_id))}${f.nomor_dokumen ? ' · ' + h(f.nomor_dokumen) : ''} · ${h(f.uploaded_by)} · ${tgl(f.tanggal_upload)} · ${h(f.ukuran_kb)} KB</div>
+    ${f.deskripsi ? `<div class="text-sm mt-1">${h(f.deskripsi)}</div>` : ''}</div>
+    <div class="flex gap-2 shrink-0"><button class="btn2" onclick="dl('${f.id}',this)">Unduh</button>
+    ${u.role === 'admin' || (u.role === 'staf' && f.uploaded_by === u.nama_lengkap) ? `<button class="btn2" onclick="ed('${f.id}')">Edit</button>` : ''}
+    ${u.role === 'admin' ? `<button class="btn2 text-[#a63a2b]" onclick="rm('${f.id}')">Hapus</button>` : ''}</div></div>`).join('')
+    || '<p class="text-center text-[#4b6866] py-10">Tidak ada berkas yang cocok. Ubah kata kunci atau kategori.</p>';
+  if (L.length > P.length) $('fl').innerHTML += `<button class="btn2 w-full" onclick="S.page++;fl()">Muat lebih banyak (${L.length - P.length})</button>`;
+}
+async function dl(id, b) {
+  await busy(b, async () => {
+    const r = await call('download', { id }), bin = atob(r.data), a = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
+    const l = document.createElement('a'); l.href = URL.createObjectURL(new Blob([a], { type: r.mime })); l.download = r.name; l.click(); URL.revokeObjectURL(l.href);
+  });
+}
+async function ed(id) {
+  const f = S.files.find(x => x.id === id), n = prompt('Nama dokumen:', f.nama_file); if (n === null) return;
+  const d = prompt('Deskripsi:', f.deskripsi || ''); if (d === null) return;
+  await call('updateFile', { id, nama_file: n, deskripsi: d }); toast('Berkas diperbarui'); await load(); fl();
+}
+async function rm(id) {
+  if (!confirm('Hapus berkas ini? Berkas dipindahkan ke folder backup dan dapat dipulihkan Admin.')) return;
+  await call('deleteFile', { id }); toast('Berkas dihapus'); await load(); fl();
+}
+
+function upload() {
+  $('view').innerHTML = `<div class="bg-white rounded-xl border border-[#d5e3e0] p-5 max-w-xl space-y-3">
+    <h2 class="font-bold text-lg">Unggah berkas</h2>
+    <div><label for="un">Nama dokumen *</label><input id="un" class="in" maxlength="150"></div>
+    <div class="grid grid-cols-2 gap-3"><div><label for="uo">Nomor dokumen</label><input id="uo" class="in" placeholder="SPO/KOMUT/001/2026"></div>
+      <div><label for="uv">Versi</label><input id="uv" class="in" value="1.0"></div></div>
+    <div class="grid grid-cols-2 gap-3"><div><label for="uk">Kategori *</label><select id="uk" class="in"><option value="">Pilih…</option>${S.kat.map(k => `<option value="${k.id}">${h(k.nama_kategori)}</option>`).join('')}</select></div>
+      <div><label for="ur">Tanggal review</label><input id="ur" type="date" class="in"></div></div>
+    <div><label for="ud">Deskripsi</label><textarea id="ud" class="in" rows="3" maxlength="500"></textarea></div>
+    <div><label for="uf">Berkas * (PDF, DOCX, XLSX, PPTX, JPG, PNG)</label><input id="uf" type="file" class="in" accept=".pdf,.docx,.xlsx,.pptx,.jpg,.jpeg,.png"></div>
+    <button id="ub" class="btn">Unggah</button></div>`;
+  $('ub').onclick = () => busy($('ub'), async () => {
+    const f = $('uf').files[0];
+    if (!$('un').value.trim() || !$('uk').value || !f) return toast('Nama, kategori, dan berkas wajib diisi', false);
+    if (f.size > 10 * 1048576) return toast('Ukuran berkas maksimal 10 MB', false);
+    $('ub').textContent = 'Mengunggah…';
+    const data = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result.split(',')[1]); r.onerror = no; r.readAsDataURL(f); });
+    try {
+      await call('upload', { nama_file: $('un').value, nomor_dokumen: $('uo').value, versi: $('uv').value, kategori_id: $('uk').value,
+        tanggal_review: $('ur').value, deskripsi: $('ud').value, filename: f.name, mime: f.type, data });
+      toast('Berkas berhasil diunggah'); await load(); go('files');
+    } finally { $('ub').textContent = 'Unggah'; }
+  });
+}
+
+function kat() {
+  $('view').innerHTML = `<div class="flex gap-2 mb-3 max-w-xl"><input id="kn" class="in" placeholder="Nama kategori baru"><button id="kb" class="btn">Tambah</button></div>
+    ${S.kat.map(k => `<div class="bg-white rounded-xl border border-[#d5e3e0] p-3 mb-2 max-w-xl flex justify-between items-center">${h(k.nama_kategori)}
+    <span class="flex gap-2"><button class="btn2" onclick="kr('${k.id}')">Ubah nama</button><button class="btn2 text-[#a63a2b]" onclick="kd('${k.id}')">Hapus</button></span></div>`).join('') || '<p class="text-[#4b6866]">Belum ada kategori. Tambahkan yang pertama.</p>'}`;
+  $('kb').onclick = () => busy($('kb'), async () => { await call('saveKategori', { nama_kategori: $('kn').value }); toast('Kategori ditambahkan'); await load(); kat(); });
+}
+async function kr(id) { const n = prompt('Nama baru:', katName(id)); if (!n) return; await call('saveKategori', { id, nama_kategori: n }); toast('Kategori diperbarui'); await load(); kat(); }
+async function kd(id) { if (!confirm('Hapus kategori ini?')) return; await call('deleteKategori', { id }); toast('Kategori dihapus'); await load(); kat(); }
+
+async function users() {
+  const U = await call('listUsers');
+  $('view').innerHTML = `<div class="bg-white rounded-xl border border-[#d5e3e0] p-4 mb-4 grid sm:grid-cols-6 gap-2 items-end">
+    <div class="sm:col-span-1"><label>Username</label><input id="nu" class="in"></div><div class="sm:col-span-2"><label>Nama lengkap</label><input id="nn" class="in"></div>
+    <div><label>Role</label><select id="nr" class="in"><option>staf</option><option>admin</option><option>viewer</option></select></div>
+    <div><label>Password awal</label><input id="np" type="text" class="in" placeholder="min. 8 karakter"></div><button id="nb" class="btn">Tambah user</button></div>
+    ${U.map(x => `<div class="bg-white rounded-xl border border-[#d5e3e0] p-3 mb-2 flex flex-wrap justify-between items-center gap-2">
+    <div><b>${h(x.nama_lengkap)}</b> <span class="text-sm text-[#4b6866]">@${h(x.username)} · ${h(x.role)} · ${h(x.status)}</span></div>
+    <span class="flex gap-2"><button class="btn2" onclick='ur(${JSON.stringify(x.id)},${JSON.stringify(x.role)},${JSON.stringify(x.status)},${JSON.stringify(x.nama_lengkap)})'>Ubah role/status</button>
+    <button class="btn2" onclick='up(${JSON.stringify(x.id)},${JSON.stringify(x.role)},${JSON.stringify(x.status)},${JSON.stringify(x.nama_lengkap)})'>Reset password</button></span></div>`).join('')}`;
+  $('nb').onclick = () => busy($('nb'), async () => { await call('saveUser', { username: $('nu').value, nama_lengkap: $('nn').value, role: $('nr').value, password: $('np').value }); toast('User ditambahkan'); users(); });
+}
+async function ur(id, role, status, nama) {
+  const r = prompt('Role (admin / staf / viewer):', role); if (!r) return;
+  const s = prompt('Status (aktif / nonaktif):', status); if (!s) return;
+  await call('saveUser', { id, role: r, status: s, nama_lengkap: nama }); toast('User diperbarui'); users();
+}
+async function up(id, role, status, nama) {
+  const p = prompt('Password baru (min. 8 karakter). User wajib menggantinya saat login:'); if (!p) return;
+  await call('saveUser', { id, role, status, nama_lengkap: nama, password: p }); toast('Password direset'); users();
+}
+
+async function set() {
+  const s = await call('getSettings');
+  $('view').innerHTML = `<div class="bg-white rounded-xl border border-[#d5e3e0] p-5 max-w-xl space-y-3"><h2 class="font-bold text-lg">Pengaturan & notifikasi</h2>
+    <div><label for="se">Email penerima notifikasi (pisahkan dengan koma)</label><input id="se" class="in" value="${h(s.email_notifikasi)}"></div>
+    <div><label for="sa">Notifikasi berkas baru</label><select id="sa" class="in"><option value="ya" ${s.notifikasi_aktif === 'ya' ? 'selected' : ''}>Aktif</option><option value="tidak" ${s.notifikasi_aktif !== 'ya' ? 'selected' : ''}>Nonaktif</option></select></div>
+    <div><label for="sm">Ukuran berkas maksimum (MB, 1–20)</label><input id="sm" type="number" class="in" value="${h(s.max_ukuran_mb)}"></div>
+    <button id="sb" class="btn">Simpan pengaturan</button></div>`;
+  $('sb').onclick = () => busy($('sb'), async () => { await call('saveSettings', { email_notifikasi: $('se').value, notifikasi_aktif: $('sa').value, max_ukuran_mb: $('sm').value }); toast('Pengaturan disimpan'); });
+}
+async function audit() {
+  const A = await call('audit');
+  $('view').innerHTML = `<div class="bg-white rounded-xl border border-[#d5e3e0] overflow-x-auto"><table class="w-full text-sm"><thead class="text-left bg-[#e6f0ee]"><tr><th class="p-2">Waktu</th><th>User</th><th>Aksi</th><th>Detail</th></tr></thead><tbody>
+    ${A.map(a => `<tr class="border-t border-[#e3eceb]"><td class="p-2 whitespace-nowrap">${h(String(a.timestamp).replace('T', ' ').slice(0, 16))}</td><td>${h(a.user)}</td><td>${h(a.aksi)}</td><td>${h(a.detail)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+/* ---- Init & PWA ---- */
+if (S.token && S.user) start().catch(() => logout(true));
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
