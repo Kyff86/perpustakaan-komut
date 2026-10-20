@@ -17,6 +17,7 @@
   .in{width:100%;border:1px solid #b9cfcc;border-radius:.5rem;padding:.55rem .75rem;background:#fff}
   .in:focus,.btn:focus-visible,.btn2:focus-visible{outline:2px solid #c9821a;outline-offset:1px}
   .nav.on{background:#0e5a5a;color:#fff}
+  input,textarea,select{-webkit-user-select:text;user-select:text;pointer-events:auto}
   label{font-size:.8rem;font-weight:600;display:block;margin-bottom:.25rem}
 </style>
 </head>
@@ -29,8 +30,10 @@
     <h1 class="text-2xl font-bold">Perpustakaan Komite Mutu</h1>
     <p class="text-sm text-[#4b6866] mb-5">Masuk untuk mengakses dokumen mutu.</p>
     <div class="space-y-3">
-      <div><label for="lu">Username</label><input id="lu" class="in" autocomplete="username"></div>
-      <div><label for="lp">Password</label><input id="lp" type="password" class="in" autocomplete="current-password"></div>
+      <div><label for="lu">Username</label><input id="lu" name="username" class="in" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+      <div><label for="lp">Password</label>
+        <div class="relative"><input id="lp" name="password" type="password" class="in pr-16" autocomplete="current-password">
+          <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 text-xs underline" onclick="const i=document.getElementById('lp');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'Tampilkan':'Sembunyikan'">Tampilkan</button></div></div>
       <button id="lb" class="btn w-full">Masuk</button>
     </div>
   </div>
@@ -50,8 +53,9 @@
 </div>
 
 <script>
-const API = 'https://script.google.com/macros/s/AKfycbz8_ZCTPUz3n7ArquvFUHTVSqhqLLAT0TBUmCFkcLf-7SXOwCHVdn8t8VI1XO3L2qUgvw/exec'; // https://script.google.com/macros/s/XXXX/exec
-const S = { token: sessionStorage.getItem('tk'), user: JSON.parse(sessionStorage.getItem('us') || 'null'), files: [], kat: [], q: '', kf: '', page: 1, tab: 'dash' };
+const API = 'GANTI_DENGAN_URL_WEB_APP_APPS_SCRIPT'; // https://script.google.com/macros/s/XXXX/exec
+const ST = { get: k => { try { return sessionStorage.getItem(k) } catch (e) { return null } }, set: (k, v) => { try { sessionStorage.setItem(k, v) } catch (e) {} }, clear: () => { try { sessionStorage.clear() } catch (e) {} } };
+const S = { token: ST.get('tk'), user: (() => { try { return JSON.parse(ST.get('us') || 'null') } catch (e) { return null } })(), files: [], kat: [], q: '', kf: '', page: 1, tab: 'dash' };
 const $ = id => document.getElementById(id);
 const h = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const tgl = s => s ? String(s).slice(0, 10) : '-';
@@ -64,8 +68,9 @@ function toast(msg, ok = true) {
 }
 async function call(action, data = {}) {
   try {
+    if (/GANTI_DENGAN/.test(API)) throw new Error('URL API belum diisi di index.html (baris const API).');
     const r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action, token: S.token, ...data }) });
-    const j = await r.json();
+    let j; try { j = await r.json(); } catch (x) { throw new Error('Respons server bukan JSON. Periksa URL Web App dan akses deployment (Anyone).'); }
     if (!j.ok) { if (/Sesi berakhir/.test(j.error)) logout(true); throw new Error(j.error); }
     return j.data;
   } catch (e) { toast(e.message === 'Failed to fetch' ? 'Tidak ada koneksi. Periksa internet Anda.' : e.message, false); throw e; }
@@ -74,12 +79,13 @@ async function busy(btn, fn) { btn.disabled = true; try { await fn(); } catch (e
 
 /* ---- Auth ---- */
 $('lb').onclick = () => busy($('lb'), async () => {
-  const r = await call('login', { username: $('lu').value, password: $('lp').value });
-  S.token = r.token; S.user = r.user; sessionStorage.setItem('tk', r.token); sessionStorage.setItem('us', JSON.stringify(r.user));
+  const r = await call('login', { username: $('lu').value.trim(), password: $('lp').value });
+  S.token = r.token; S.user = r.user; ST.set('tk', r.token); ST.set('us', JSON.stringify(r.user));
   $('lp').value = ''; await start();
 });
+$('lu').onkeydown = e => e.key === 'Enter' && $('lp').focus();
 $('lp').onkeydown = e => e.key === 'Enter' && $('lb').click();
-function logout(silent) { if (!silent && S.token) call('logout').catch(() => {}); sessionStorage.clear(); S.token = null; S.user = null; $('app').classList.add('hidden'); $('login').classList.remove('hidden'); }
+function logout(silent) { if (!silent && S.token) call('logout').catch(() => {}); ST.clear(); S.token = null; S.user = null; $('app').classList.add('hidden'); $('login').classList.remove('hidden'); }
 $('out').onclick = () => logout();
 async function gantiPw() {
   const p = prompt('Password baru (minimal 8 karakter):'); if (!p) return;
