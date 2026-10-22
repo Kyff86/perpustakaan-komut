@@ -2024,6 +2024,7 @@
             <select id="k-sopall-kat" onchange="kSopPubRender()" class="px-2 py-1.5 text-xs rounded-lg border border-border-form bg-white"><option value="">Semua kategori</option></select>
             <select id="k-sopall-st" onchange="kSopPubRender()" class="px-2 py-1.5 text-xs rounded-lg border border-border-form bg-white"><option value="">Semua status</option><option value="Draft">Draft</option><option value="Substansi">Review Substansi</option><option value="Legalitas">Review Legalitas</option><option value="Rejected">Revisi</option><option value="Final">Final (Menunggu Direktur)</option><option value="Approved">Disetujui</option><option value="Kadaluarsa">Kadaluarsa / perlu ditinjau</option></select>
             <label class="text-xs flex items-center gap-1"><input id="k-sopall-bm" type="checkbox" onchange="kSopPubRender()"> Tersimpan &#9733;</label>
+            <button id="k-filt-btn" onclick="kFilterOpen()" class="hidden items-center gap-1 px-2 py-1.5 text-xs rounded-lg border border-primary text-primary font-semibold"><span class="material-symbols-outlined text-[15px]">tune</span>Kelola Filter</button>
             <label class="text-xs flex items-center gap-1"><input id="k-sopall-grp" type="checkbox" onchange="kSopPubRender()"> Per ruangan</label>
           </div>
           <div id="k-sopall-body" class="bg-surface-card rounded-xl border border-border-subtle overflow-hidden"></div>
@@ -6767,7 +6768,9 @@
         const card = (l, v, ic, c) => `<div class="bg-surface-card rounded-xl border border-border-subtle p-4 flex items-center gap-3"><span class="material-symbols-outlined ${c} text-[30px]">${ic}</span><div><p class="text-2xl font-extrabold text-text-primary leading-none">${v || 0}</p><p class="text-[11px] text-text-secondary mt-1">${l}</p></div></div>`;
         const ev = (res.minggu || []).map(k => `<li class="py-2 flex gap-3 items-start"><span class="text-[11px] font-bold text-primary bg-surface-container-low rounded px-2 py-1 shrink-0">${kFmtDate(k.tanggal)}</span><div class="min-w-0"><p class="text-xs font-semibold text-text-primary">${k.nama}</p><p class="text-[11px] text-text-muted">${k.keterangan || ''}</p></div></li>`).join('');
         kEl('k-home-body').innerHTML = `<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">${card('SOP Aktif', s.aktif, 'verified', 'text-green-600')}${card('SOP Kadaluarsa', s.kadaluarsa, 'event_busy', 'text-red-600')}${card('SOP Dalam Proses', s.proses, 'pending_actions', 'text-amber-600')}${card('Menunggu Tindakan Anda', s.menunggu_saya, 'notification_important', 'text-primary')}</div>
+          <div class="bg-surface-card rounded-xl border border-border-subtle p-4 mt-4"><h3 class="font-bold text-sm text-text-primary mb-1">Status SOP</h3><p class="text-[11px] text-text-muted mb-3">Ketuk salah satu status untuk membuka Pustaka SOP dengan filter yang sama.</p><div id="k-home-sop"></div></div>
           <div class="bg-surface-card rounded-xl border border-border-subtle p-4 mt-4"><h3 class="font-bold text-sm text-text-primary mb-2">Kegiatan 7 Hari ke Depan</h3>${ev ? '<ul class="divide-y divide-border-subtle">' + ev + '</ul>' : kEmpty('Tidak ada kegiatan terjadwal dalam 7 hari ke depan.')}</div>`;
+        kHomeSop();
       }, true);
     }
 
@@ -6986,14 +6989,21 @@ const KS_BADGE = { Draft: 'bg-slate-100 text-slate-700', Substansi: 'bg-amber-10
 const KS_KAT = ['Keselamatan Pasien', 'Manajemen Data Mutu', 'Peningkatan Mutu', 'Manajemen Risiko', 'Tata Kelola PMKP', 'Pelayanan Klinis', 'Pelayanan Penunjang', 'Administrasi & Manajemen'];
 const kD = v => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || ''); return m ? m[3] + '/' + m[2] + '/' + m[1] : '-'; };
 const kPh = v => !v || /…|\.{3}/.test(String(v));
+K.filt = { ruangan: [], kategori: [] };
+const kAb = (a, b) => String(a).localeCompare(String(b), 'id');
+const kUnion = (a, b) => Array.from(new Set((a || []).concat(b || []))).sort(kAb);
+const kKatList = () => kUnion(K.filt.kategori.length ? K.filt.kategori : KS_KAT, K.sopPub.map(x => x.kategori).filter(Boolean));
+function kSopFillSel() {
+  const fill = (id, label, vals) => { const el = kEl(id); if (!el) return; const cur = el.value; el.innerHTML = `<option value="">${label}</option>` + vals.map(v => `<option value="${v}">${v}</option>`).join(''); el.value = vals.indexOf(cur) >= 0 ? cur : ''; };
+  fill('k-sopall-unit', 'Semua ruangan', kUnion(K.filt.ruangan, K.sopPub.map(x => x.unit)));
+  fill('k-sopall-kat', 'Semua kategori', kKatList());
+}
 function kSopPubLoad() {
   kCall('apiSopLibrary', [], res => {
     if (!res.success) return;
-    K.sopPub = res.items || [];
-    const fill = (id, label, vals) => { const el = kEl(id); if (!el) return; const cur = el.value; el.innerHTML = `<option value="">${label}</option>` + vals.map(v => `<option value="${v}">${v}</option>`).join(''); el.value = vals.indexOf(cur) >= 0 ? cur : ''; };
-    const ab = (a, b) => String(a).localeCompare(String(b), 'id');
-    fill('k-sopall-unit', 'Semua ruangan', Array.from(new Set(K.sopPub.map(x => x.unit))).sort(ab));
-    fill('k-sopall-kat', 'Semua kategori', Array.from(new Set(KS_KAT.concat(K.sopPub.map(x => x.kategori).filter(Boolean)))).sort(ab));
+    K.sopPub = res.items || []; if (res.filt) K.filt = res.filt;
+    kSopFillSel();
+    if (K.sopGo !== undefined) { ['k-sopall-q', 'k-sopall-unit', 'k-sopall-kat'].forEach(i => { kEl(i).value = ''; }); kEl('k-sopall-bm').checked = false; kEl('k-sopall-st').value = K.sopGo; K.sopGo = undefined; }
     kSopPubRender();
   }, true);
 }
@@ -7040,6 +7050,7 @@ function kSopPubRender() {
   const bm = kEl('k-sopall-bm') && kEl('k-sopall-bm').checked, grp = kEl('k-sopall-grp') && kEl('k-sopall-grp').checked;
   const rows = K.sopPub.filter(s => (!u || s.unit === u) && (!kt || s.kategori === kt) && (!bm || s.bm)
     && (!st || (st === 'Kadaluarsa' ? s.kadaluarsa : s.status === st)) && (!q || (s.judul + ' ' + (s.nomor || '') + ' ' + s.unit + ' ' + (s.kategori || '')).toLowerCase().indexOf(q) >= 0));
+  kEl('k-filt-btn').classList.toggle('hidden', !kW()); kEl('k-filt-btn').classList.toggle('flex', kW());
   kEl('k-sop-count').textContent = rows.length + ' dari ' + K.sopPub.length + ' SOP';
   let h = '';
   if (grp) { const by = {}; rows.forEach(s => { (by[s.unit] = by[s.unit] || []).push(s); }); h = Object.keys(by).map(un => `<div class="px-3 py-2 bg-surface-container-low text-[11px] font-bold text-primary">${un} (${by[un].length})</div>` + by[un].map(kSopRow).join('')).join(''); }
@@ -7072,8 +7083,8 @@ function kSopPreview(id) {
   const gap = `<div style="text-align:left;font-size:12px;max-height:55vh;overflow:auto">${g.map(x => `<div style="padding:5px 0;border-top:1px solid #e2e8f0"><b style="color:${x.ok ? '#15803d' : '#b45309'}">${x.ok ? '&#10003;' : '&#9888;'} ${x.label}</b>${x.ok ? '' : `<div style="font-size:11px;color:#64748b">${x.hint}</div>`}</div>`).join('')}</div>`;
   K._pv = { doc, gap };
   Swal.fire({ width: '60rem', showConfirmButton: false, showCloseButton: true, html: `<div>${kSopMetaHtml(s)}<div style="display:flex;gap:6px;margin:12px 0 8px;flex-wrap:wrap;align-items:center">
-    <button class="swal2-styled" style="margin:0;background:#166534" onclick="kPvTab('doc')">Dokumen</button><button class="swal2-styled" style="margin:0;background:#b45309" onclick="kPvTab('gap')">Kelengkapan KARS (${g.length - nok.length}/${g.length})</button>
-    <span style="flex:1"></span><button class="swal2-styled" style="margin:0;background:#0369a1" onclick="kSopDownload('${s.id}')">Unduh</button><button class="swal2-styled" style="margin:0;background:#475569" onclick="kSopPrint('${s.id}')">Cetak / PDF</button>${s.can_edit ? `<button class="swal2-styled" style="margin:0;background:#7c3aed" onclick="kSopEdit('${s.id}')">Edit Detail</button>` : ''}</div><div id="k-pv">${doc}</div></div>` });
+    <button class="swal2-styled" style="margin:0;color:#fff !important;font-weight:600;font-size:13px;text-shadow:none;background:#166534" onclick="kPvTab('doc')">Dokumen</button><button class="swal2-styled" style="margin:0;color:#fff !important;font-weight:600;font-size:13px;text-shadow:none;background:#b45309" onclick="kPvTab('gap')">Kelengkapan KARS (${g.length - nok.length}/${g.length})</button>
+    <span style="flex:1"></span><button class="swal2-styled" style="margin:0;color:#fff !important;font-weight:600;font-size:13px;text-shadow:none;background:#0369a1" onclick="kSopDownload('${s.id}')">Unduh</button><button class="swal2-styled" style="margin:0;color:#fff !important;font-weight:600;font-size:13px;text-shadow:none;background:#475569" onclick="kSopPrint('${s.id}')">Cetak / PDF</button>${s.can_edit ? `<button class="swal2-styled" style="margin:0;color:#fff !important;font-weight:600;font-size:13px;text-shadow:none;background:#7c3aed" onclick="kSopEdit('${s.id}')">Edit Detail</button>` : ''}</div><div id="k-pv">${doc}</div></div>` });
 }
 function kPvTab(t) { kEl('k-pv').innerHTML = K._pv[t]; }
 function kSopDoc(s) {
@@ -7096,7 +7107,7 @@ function kSopEdit(id) {
   const s = K.sopPub.find(x => String(x.id) === String(id)); if (!s) return; const i = s.isi || {};
   const ta = (k, l) => `<label class="block text-[11px] font-bold text-text-secondary mt-2">${l}</label><textarea id="se-${k}" rows="2" class="swal2-textarea" style="${kBox}">${i[k] || ''}</textarea>`;
   Swal.fire({ title: 'Edit Detail SOP', width: '42rem', showCancelButton: true, confirmButtonText: 'Simpan', cancelButtonText: 'Batal',
-    html: `<div class="text-left">${kField('se-judul', 'Nama SOP', 'text', s.judul)}<label class="block text-[11px] font-bold text-text-secondary mt-2">Kategori</label><select id="se-kat" class="swal2-select" style="${kBox}"><option value=""></option>${Array.from(new Set(KS_KAT.concat(s.kategori ? [s.kategori] : []))).map(k => `<option ${k === s.kategori ? 'selected' : ''}>${k}</option>`).join('')}</select>
+    html: `<div class="text-left">${kField('se-judul', 'Nama SOP', 'text', s.judul)}<label class="block text-[11px] font-bold text-text-secondary mt-2">Kategori</label><select id="se-kat" class="swal2-select" style="${kBox}"><option value=""></option>${kUnion(kKatList(), s.kategori ? [s.kategori] : []).map(k => `<option ${k === s.kategori ? 'selected' : ''}>${k}</option>`).join('')}</select>
       ${kField('se-nomor', 'Nomor dokumen', 'text', kPh(s.nomor) ? '' : s.nomor)}${kField('se-versi', 'Versi', 'text', s.versi)}${kField('se-dibuat', 'Tanggal pembuatan', 'date', s.tgl_dibuat)}${kField('se-berlaku', 'Tanggal berlaku', 'date', s.tgl_berlaku)}${kField('se-kadal', 'Tanggal kadaluarsa (maks. 3 tahun)', 'date', s.tgl_kadaluarsa)}
       ${ta('pengertian', 'Pengertian')}${ta('tujuan', 'Tujuan')}${ta('kebijakan', 'Kebijakan')}${ta('ruang_lingkup', 'Ruang lingkup / unit terkait')}${ta('monitoring', 'Monitoring & evaluasi')}${ta('distribusi', 'Distribusi & bukti sosialisasi')}</div>`,
     didOpen: () => { kEl('se-berlaku').onchange = e => { if (e.target.value && !kEl('se-kadal').value) { const d = new Date(e.target.value); d.setFullYear(d.getFullYear() + 3); kEl('se-kadal').value = d.toISOString().slice(0, 10); } }; },
@@ -7105,6 +7116,30 @@ function kSopEdit(id) {
     .then(r => { if (r.isConfirmed) kCall('apiSopMeta', [id, r.value], res => { if (res.success) kSopPubLoad(); }); });
 }
 
+
+function kFilterOpen() {
+  Swal.fire({ title: 'Kelola Filter SOP', width: '44rem', confirmButtonText: 'Selesai', html: '<div id="kf-body" class="text-left"></div>', didOpen: kFiltRender });
+}
+function kFiltRender() {
+  const box = kEl('kf-body'); if (!box) return;
+  box.innerHTML = [['ruangan', 'Ruangan / Unit'], ['kategori', 'Kategori']].map(([j, t]) => {
+    const list = j === 'kategori' ? kUnion(K.filt.kategori, []) : kUnion(K.filt.ruangan, []);
+    return `<div class="mb-4"><p class="text-xs font-bold text-primary mb-2">${t} (${list.length})</p><div class="flex flex-wrap gap-1.5 mb-2 max-h-40 overflow-auto">${list.map((n, i) => `<span class="inline-flex items-center gap-1 bg-surface-container-low border border-border-subtle rounded-full pl-3 pr-1 py-0.5 text-[11px]">${n}<button type="button" title="Hapus" onclick="kFilterDel('${j}', ${i})" class="w-5 h-5 rounded-full text-red-600 hover:bg-red-100 font-bold leading-none">&times;</button></span>`).join('') || '<span class="text-[11px] text-text-muted">Belum ada.</span>'}</div>
+      <div class="flex gap-2"><input id="kf-${j}" type="text" maxlength="80" placeholder="Tambah ${t.toLowerCase()} baru..." onkeydown="if(event.key==='Enter')kFilterAdd('${j}')" class="flex-1 px-3 py-1.5 text-xs rounded-lg border border-border-form bg-white"><button onclick="kFilterAdd('${j}')" class="bg-primary text-white px-3 py-1.5 rounded-lg text-xs font-semibold" style="color:#fff">Tambah</button></div></div>`;
+  }).join('');
+}
+function kFilterDone(res) { if (res.success && res.filt) { K.filt = res.filt; kSopFillSel(); kSopPubRender(); kFiltRender(); } else if (res && res.message) { Swal.showValidationMessage(res.message); } }
+function kFilterAdd(j) { const v = kVal('kf-' + j).trim(); if (!v) return; kCall('apiSopFilterSave', [j, v], kFilterDone, true); }
+function kFilterDel(j, i) { const n = kUnion(K.filt[j], [])[i]; if (n !== undefined) kCall('apiSopFilterDelete', [j, unesc(n)], kFilterDone, true); }
+function kSopGo(st) { K.sopGo = st; switchTab('sopall'); }
+function kHomeSop() {
+  kCall('apiSopLibrary', [], res => {
+    const box = kEl('k-home-sop'); if (!res.success || !box) return; const it = res.items || [];
+    const defs = [['', 'Semua SOP', 'bg-slate-200 text-slate-800'], ['Draft', 'Draft'], ['Substansi', 'Review Substansi'], ['Legalitas', 'Review Legalitas'], ['Rejected', 'Revisi'], ['Final', 'Final (Menunggu Direktur)'], ['Approved', 'Disetujui'], ['Kadaluarsa', 'Kadaluarsa', 'bg-red-100 text-red-700']];
+    box.innerHTML = '<div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">' + defs.map(([k, l, c]) => { const n = k === '' ? it.length : it.filter(s => k === 'Kadaluarsa' ? s.kadaluarsa : s.status === k).length;
+      return `<button onclick="kSopGo('${k}')" class="rounded-xl border border-border-subtle bg-white p-3 text-left hover:shadow-md transition"><p class="text-2xl font-extrabold text-text-primary leading-none">${n}</p><span class="inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-bold ${c || KS_BADGE[k]}">${l}</span></button>`; }).join('') + '</div>';
+  }, true);
+}
 </script>
   <div id="printArea"></div>
   <script>
