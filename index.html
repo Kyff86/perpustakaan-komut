@@ -6773,29 +6773,37 @@
 
     // ---------- Jadwal Kegiatan ----------
     let kCal = { y: new Date().getFullYear(), m: new Date().getMonth() };
-    function kCalMove(d) { kCal.m += d; if (kCal.m < 0) { kCal.m = 11; kCal.y--; } if (kCal.m > 11) { kCal.m = 0; kCal.y++; } kJadwalRender(); }
+    function kCalMove(d) { kCal.sel = null; kCal.m += d; if (kCal.m < 0) { kCal.m = 11; kCal.y--; } if (kCal.m > 11) { kCal.m = 0; kCal.y++; } kJadwalRender(); }
     function kJadwalLoad() { kCall('apiKegList', [], res => { if (res.success) { K.keg = res.items || []; kJadwalRender(); } }, true); }
     function kJadwalRender() {
       const y = kCal.y, m = kCal.m, start = (new Date(y, m, 1).getDay() + 6) % 7, days = new Date(y, m + 1, 0).getDate();
-      const today = new Date(), todayKey = today.getFullYear() + '-' + kPad(today.getMonth() + 1) + '-' + kPad(today.getDate());
-      const ev = {}; K.keg.forEach(k => { (ev[k.tanggal] = ev[k.tanggal] || []).push(k); });
+      const now = new Date(), todayKey = now.getFullYear() + '-' + kPad(now.getMonth() + 1) + '-' + kPad(now.getDate());
+      const pre = y + '-' + kPad(m + 1), ev = {}; K.keg.forEach(k => { (ev[k.tanggal] = ev[k.tanggal] || []).push(k); });
+      if (!kCal.sel || kCal.sel.indexOf(pre) !== 0) {
+        const first = Object.keys(ev).filter(k => k.indexOf(pre) === 0).sort()[0];
+        kCal.sel = todayKey.indexOf(pre) === 0 ? todayKey : (first || pre + '-01');
+      }
+      const sel = kCal.sel;
       kEl('k-cal-label').innerText = BLN_FULL[m] + ' ' + y;
       let cells = '';
       for (let i = 0; i < start; i++) cells += '<div></div>';
       for (let d = 1; d <= days; d++) {
-        const key = y + '-' + kPad(m + 1) + '-' + kPad(d), col = (start + d - 1) % 7, off = col >= 5 || KHOL[key], n = (ev[key] || []).length;
-        cells += `<button type="button" onclick="kDayClick('${key}')" title="${esc(KHOL[key] || '')}" class="min-h-[58px] rounded-lg border p-1 text-left flex flex-col ${off ? 'bg-red-50 border-red-200 text-red-600' : 'bg-white border-border-subtle text-text-primary'} ${key === todayKey ? 'ring-2 ring-primary' : ''}"><span class="text-xs font-bold">${d}</span>${KHOL[key] ? `<span class="text-[9px] leading-tight truncate w-full">${esc(KHOL[key])}</span>` : ''}${n ? `<span class="mt-auto text-[9px] font-bold text-white bg-primary rounded px-1 self-start">${n} kegiatan</span>` : ''}</button>`;
+        const key = pre + '-' + kPad(d), col = (start + d - 1) % 7, off = col >= 5 || KHOL[key], n = (ev[key] || []).length, on = key === sel;
+        cells += `<button type="button" onclick="kDayClick('${key}')" title="${esc(KHOL[key] || '')}" class="relative aspect-square rounded-lg text-xs font-semibold flex flex-col items-center justify-center transition ${on ? 'bg-primary text-white shadow' : (off ? 'text-red-600 hover:bg-red-50' : 'text-text-primary hover:bg-surface-container-low')} ${key === todayKey && !on ? 'ring-2 ring-primary' : ''}">${d}${n ? `<span class="absolute bottom-1 flex gap-0.5">${'<i class="w-1.5 h-1.5 rounded-full ' + (on ? 'bg-white' : 'bg-primary') + '"></i>'.repeat(Math.min(n, 3))}</span>` : ''}</button>`;
       }
-      const prefix = y + '-' + kPad(m + 1);
-      const list = K.keg.filter(k => String(k.tanggal).indexOf(prefix) === 0).sort((a, b) => a.tanggal < b.tanggal ? -1 : 1).map(k => `<li class="py-2.5 flex items-start gap-3"><span class="text-[11px] font-bold text-primary bg-surface-container-low rounded px-2 py-1 shrink-0">${kFmtDate(k.tanggal)}</span><div class="min-w-0 flex-1"><p class="text-xs font-semibold text-text-primary">${k.nama}</p><p class="text-[11px] text-text-muted">${k.keterangan || ''}</p>${k.bukti_url ? `<a href="${k.bukti_url}" target="_blank" rel="noopener" class="text-[11px] text-primary underline">Lihat bukti</a>` : ''}</div>${kW() ? `<button onclick="kKegForm('${k.id}')" class="text-primary text-[11px] font-semibold">Ubah</button><button onclick="kKegDel('${k.id}')" class="text-error text-[11px] font-semibold">Hapus</button>` : ''}</li>`).join('');
-      kEl('k-jadwal-body').innerHTML = `<div class="bg-surface-card rounded-xl border border-border-subtle p-3"><div class="grid grid-cols-7 gap-1 mb-1 text-center text-[10px] font-bold text-text-muted"><span>Sen</span><span>Sel</span><span>Rab</span><span>Kam</span><span>Jum</span><span class="text-red-600">Sab</span><span class="text-red-600">Min</span></div><div class="grid grid-cols-7 gap-1">${cells}</div><p class="text-[10px] text-text-muted mt-2">Merah = Sabtu/Minggu atau libur nasional.${kW() ? ' Ketuk tanggal untuk menambah kegiatan.' : ''}</p></div>
-        <div class="bg-surface-card rounded-xl border border-border-subtle p-4 mt-3"><h3 class="font-bold text-sm mb-1">Kegiatan ${BLN_FULL[m]} ${y}</h3>${list ? '<ul class="divide-y divide-border-subtle">' + list + '</ul>' : kEmpty('Belum ada kegiatan pada bulan ini.')}</div>`;
+      const monthN = Object.keys(ev).filter(k => k.indexOf(pre) === 0).reduce((a, k) => a + ev[k].length, 0);
+      const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'], sd = new Date(sel + 'T00:00:00');
+      const list = (ev[sel] || []).map(k => {
+        const id = kDriveId(k.bukti_url), foto = k.bukti_url ? (id ? `<a href="${k.bukti_url}" target="_blank" rel="noopener" class="block mt-2"><img src="https://drive.google.com/thumbnail?id=${id}&sz=w800" alt="Bukti kegiatan" loading="lazy" onerror="this.parentNode.outerHTML='<a href=&quot;${k.bukti_url}&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot; class=&quot;inline-block mt-2 text-[11px] text-primary underline&quot;>Buka berkas bukti</a>'" class="w-full max-h-72 object-cover rounded-lg border border-border-subtle"></a>` : `<a href="${k.bukti_url}" target="_blank" rel="noopener" class="inline-block mt-2 text-[11px] text-primary underline">Buka berkas bukti</a>`) : '<p class="mt-2 text-[11px] text-text-muted italic">Belum ada bukti unggahan.</p>';
+        return `<div class="rounded-xl border border-border-subtle bg-white p-4 shadow-sm"><div class="flex items-start gap-2"><span class="material-symbols-outlined text-primary text-[20px]">event_available</span><div class="min-w-0 flex-1"><p class="text-sm font-bold text-text-primary">${k.nama}</p>${k.keterangan ? `<p class="text-xs text-text-secondary mt-1 whitespace-pre-line">${k.keterangan}</p>` : ''}</div>${kW() ? `<div class="flex gap-2 shrink-0"><button onclick="kKegForm('${k.id}')" class="text-primary text-[11px] font-semibold">Ubah</button><button onclick="kKegDel('${k.id}')" class="text-error text-[11px] font-semibold">Hapus</button></div>` : ''}</div>${foto}</div>`;
+      }).join('');
+      kEl('k-jadwal-body').innerHTML = `<div class="grid gap-4 lg:grid-cols-[340px_1fr] items-start">
+        <div class="bg-surface-card rounded-2xl border border-border-subtle p-4 shadow-sm"><div class="grid grid-cols-7 gap-1 mb-2 text-center text-[10px] font-bold text-text-muted uppercase"><span>Sen</span><span>Sel</span><span>Rab</span><span>Kam</span><span>Jum</span><span class="text-red-600">Sab</span><span class="text-red-600">Min</span></div><div class="grid grid-cols-7 gap-1">${cells}</div>
+          <div class="mt-3 pt-3 border-t border-border-subtle flex items-center justify-between text-[11px] text-text-muted"><span><i class="inline-block w-2 h-2 rounded-full bg-primary mr-1"></i>Ada kegiatan</span><span class="font-semibold text-text-primary">${monthN} kegiatan bulan ini</span></div></div>
+        <div class="flex flex-col gap-3"><div class="rounded-2xl bg-gradient-to-r from-primary to-primary-container text-white p-4 flex flex-wrap items-center justify-between gap-2"><div><p class="text-[11px] uppercase tracking-wide opacity-80">${HARI[sd.getDay()]}</p><h3 class="font-display font-extrabold text-lg leading-tight">${kFmtDate(sel)}</h3>${KHOL[sel] ? `<p class="text-[11px] mt-0.5 opacity-90">${esc(KHOL[sel])}</p>` : ''}</div><div class="flex items-center gap-2"><span class="text-[11px] bg-white/20 rounded-full px-3 py-1 font-semibold">${(ev[sel] || []).length} kegiatan</span>${kW() ? `<button onclick="kKegForm(null,'${sel}')" class="bg-white text-primary px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">add</span>Tambah</button>` : ''}</div></div>
+          ${list || `<div class="rounded-xl border border-dashed border-border-subtle bg-white">${kEmpty('Tidak ada kegiatan pada tanggal ini.')}</div>`}</div></div>`;
     }
-    function kDayClick(key) {
-      if (kW()) return kKegForm(null, key);
-      const l = K.keg.filter(k => k.tanggal === key);
-      Swal.fire({ title: kFmtDate(key), html: l.length ? l.map(k => `<p class="text-xs text-left"><b>${k.nama}</b><br>${k.keterangan || ''}</p>`).join('<hr>') : (KHOL[key] ? esc(KHOL[key]) : 'Tidak ada kegiatan.'), confirmButtonText: 'Tutup' });
-    }
+    function kDayClick(key) { kCal.sel = key; kJadwalRender(); }
     function kKegForm(id, tgl) {
       const k = id ? K.keg.find(x => x.id === id) : null;
       Swal.fire({ title: k ? 'Ubah Kegiatan' : 'Tambah Kegiatan', showCancelButton: true, confirmButtonText: 'Simpan', cancelButtonText: 'Batal',
@@ -6985,7 +6993,7 @@ function kSopPubLoad() {
     const fill = (id, label, vals) => { const el = kEl(id); if (!el) return; const cur = el.value; el.innerHTML = `<option value="">${label}</option>` + vals.map(v => `<option value="${v}">${v}</option>`).join(''); el.value = vals.indexOf(cur) >= 0 ? cur : ''; };
     const ab = (a, b) => String(a).localeCompare(String(b), 'id');
     fill('k-sopall-unit', 'Semua ruangan', Array.from(new Set(K.sopPub.map(x => x.unit))).sort(ab));
-    fill('k-sopall-kat', 'Semua kategori', Array.from(new Set(K_KAT.concat(K.sopPub.map(x => x.kategori).filter(Boolean)))).sort(ab));
+    fill('k-sopall-kat', 'Semua kategori', Array.from(new Set(KS_KAT.concat(K.sopPub.map(x => x.kategori).filter(Boolean)))).sort(ab));
     kSopPubRender();
   }, true);
 }
@@ -7088,7 +7096,7 @@ function kSopEdit(id) {
   const s = K.sopPub.find(x => String(x.id) === String(id)); if (!s) return; const i = s.isi || {};
   const ta = (k, l) => `<label class="block text-[11px] font-bold text-text-secondary mt-2">${l}</label><textarea id="se-${k}" rows="2" class="swal2-textarea" style="${kBox}">${i[k] || ''}</textarea>`;
   Swal.fire({ title: 'Edit Detail SOP', width: '42rem', showCancelButton: true, confirmButtonText: 'Simpan', cancelButtonText: 'Batal',
-    html: `<div class="text-left">${kField('se-judul', 'Nama SOP', 'text', s.judul)}<label class="block text-[11px] font-bold text-text-secondary mt-2">Kategori</label><select id="se-kat" class="swal2-select" style="${kBox}"><option value=""></option>${Array.from(new Set(K_KAT.concat(s.kategori ? [s.kategori] : []))).map(k => `<option ${k === s.kategori ? 'selected' : ''}>${k}</option>`).join('')}</select>
+    html: `<div class="text-left">${kField('se-judul', 'Nama SOP', 'text', s.judul)}<label class="block text-[11px] font-bold text-text-secondary mt-2">Kategori</label><select id="se-kat" class="swal2-select" style="${kBox}"><option value=""></option>${Array.from(new Set(KS_KAT.concat(s.kategori ? [s.kategori] : []))).map(k => `<option ${k === s.kategori ? 'selected' : ''}>${k}</option>`).join('')}</select>
       ${kField('se-nomor', 'Nomor dokumen', 'text', kPh(s.nomor) ? '' : s.nomor)}${kField('se-versi', 'Versi', 'text', s.versi)}${kField('se-dibuat', 'Tanggal pembuatan', 'date', s.tgl_dibuat)}${kField('se-berlaku', 'Tanggal berlaku', 'date', s.tgl_berlaku)}${kField('se-kadal', 'Tanggal kadaluarsa (maks. 3 tahun)', 'date', s.tgl_kadaluarsa)}
       ${ta('pengertian', 'Pengertian')}${ta('tujuan', 'Tujuan')}${ta('kebijakan', 'Kebijakan')}${ta('ruang_lingkup', 'Ruang lingkup / unit terkait')}${ta('monitoring', 'Monitoring & evaluasi')}${ta('distribusi', 'Distribusi & bukti sosialisasi')}</div>`,
     didOpen: () => { kEl('se-berlaku').onchange = e => { if (e.target.value && !kEl('se-kadal').value) { const d = new Date(e.target.value); d.setFullYear(d.getFullYear() + 3); kEl('se-kadal').value = d.toISOString().slice(0, 10); } }; },
