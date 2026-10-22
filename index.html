@@ -15,6 +15,51 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
   <meta name="apple-mobile-web-app-title" content="KMKP RSUD Merauke"/>
   <title>Sistem KMKP RSUD Merauke</title>
+  <script src="config.js"></script>
+  <script>
+  /* Penghubung ke database (Apps Script Web App) untuk versi GitHub Pages.
+     Meniru google.script.run agar seluruh kode aplikasi tetap sama. */
+  (function () {
+    var URL_API = (window.KMKP_API_URL || '').trim();
+    var inGAS = typeof google !== 'undefined' && google.script && google.script.run;
+    if (inGAS) return;
+    if (!/^https:\/\/script\.google\.com\/.+\/exec/.test(URL_API)) {
+      window.addEventListener('DOMContentLoaded', function () {
+        var b = document.createElement('div');
+        b.textContent = 'MODE DEMO: belum terhubung ke database. Isi URL Web App pada file config.js';
+        b.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#b91c1c;color:#fff;font:600 12px sans-serif;text-align:center;padding:6px';
+        document.body.appendChild(b);
+      });
+      return;
+    }
+    function call(fn, args) {
+      return fetch(URL_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ fn: fn, args: args })
+      }).then(function (r) { return r.json(); }).then(function (j) {
+        if (!j.ok) throw new Error(j.error || 'Gagal menghubungi server.');
+        return j.result;
+      });
+    }
+    function make(ok, fail) {
+      return new Proxy({}, {
+        get: function (_, name) {
+          if (name === 'withSuccessHandler') return function (f) { return make(f, fail); };
+          if (name === 'withFailureHandler') return function (f) { return make(ok, f); };
+          if (name === 'then') return undefined;
+          return function () {
+            var args = Array.prototype.slice.call(arguments);
+            call(String(name), args).then(function (r) { if (ok) ok(r); })
+              .catch(function (e) { if (fail) fail(e); else console.error(e); });
+          };
+        }
+      });
+    }
+    window.google = { script: { run: make(null, null) } };
+  })();
+  </script>
+
 
   <!-- Typography: Plus Jakarta Sans (Headings) & Inter (Body/Labels) -->
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
