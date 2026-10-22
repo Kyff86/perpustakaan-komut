@@ -6764,13 +6764,27 @@
     function kHome() {
       kCall('apiKomiteHome', [], res => {
         if (!res.success) return;
-        const s = res.stats || {};
-        const card = (l, v, ic, c) => `<div class="bg-surface-card rounded-xl border border-border-subtle p-4 flex items-center gap-3"><span class="material-symbols-outlined ${c} text-[30px]">${ic}</span><div><p class="text-2xl font-extrabold text-text-primary leading-none">${v || 0}</p><p class="text-[11px] text-text-secondary mt-1">${l}</p></div></div>`;
-        const ev = (res.minggu || []).map(k => `<li class="py-2 flex gap-3 items-start"><span class="text-[11px] font-bold text-primary bg-surface-container-low rounded px-2 py-1 shrink-0">${kFmtDate(k.tanggal)}</span><div class="min-w-0"><p class="text-xs font-semibold text-text-primary">${k.nama}</p><p class="text-[11px] text-text-muted">${k.keterangan || ''}</p></div></li>`).join('');
-        kEl('k-home-body').innerHTML = `<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">${card('SOP Aktif', s.aktif, 'verified', 'text-green-600')}${card('SOP Kadaluarsa', s.kadaluarsa, 'event_busy', 'text-red-600')}${card('SOP Dalam Proses', s.proses, 'pending_actions', 'text-amber-600')}${card('Menunggu Tindakan Anda', s.menunggu_saya, 'notification_important', 'text-primary')}</div>
-          <div class="bg-surface-card rounded-xl border border-border-subtle p-4 mt-4"><h3 class="font-bold text-sm text-text-primary mb-1">Status SOP</h3><p class="text-[11px] text-text-muted mb-3">Ketuk salah satu status untuk membuka Pustaka SOP dengan filter yang sama.</p><div id="k-home-sop"></div></div>
-          <div class="bg-surface-card rounded-xl border border-border-subtle p-4 mt-4"><h3 class="font-bold text-sm text-text-primary mb-2">Kegiatan 7 Hari ke Depan</h3>${ev ? '<ul class="divide-y divide-border-subtle">' + ev + '</ul>' : kEmpty('Tidak ada kegiatan terjadwal dalam 7 hari ke depan.')}</div>`;
-        kHomeSop();
+        const minggu = res.minggu || [];
+        kCall('apiSopLibrary', [], lib => {
+          const it = lib.success ? (lib.items || []) : []; K.sopPub = it; if (lib.filt) K.filt = lib.filt;
+          const n = k => k === 'Kadaluarsa' ? it.filter(s => s.kadaluarsa).length : it.filter(s => s.status === k).length, tot = it.length;
+          const sc = it.length ? Math.round(it.reduce((a, s) => { const g = kGapScore(s); return a + g[0] / g[1]; }, 0) / it.length * 100) : 0;
+          const st = [['Draft', 'Draft', '#64748b'], ['Substansi', 'Review Substansi', '#f59e0b'], ['Legalitas', 'Review Legalitas', '#0ea5e9'], ['Final', 'Final (Direktur)', '#6366f1'], ['Approved', 'Disetujui', '#16a34a']];
+          const kpi = (ic, c, v, l, sub) => `<div class="bg-surface-card rounded-2xl border border-border-subtle p-4 flex items-center gap-3 shadow-sm"><span class="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style="background:${c}1a;color:${c}"><span class="material-symbols-outlined text-[24px]">${ic}</span></span><div class="min-w-0"><p class="text-2xl font-extrabold text-text-primary leading-none">${v}</p><p class="text-xs font-semibold text-text-secondary mt-1">${l}</p><p class="text-[10px] text-text-muted truncate">${sub}</p></div></div>`;
+          const tile = ([k, l, c], i) => `<button onclick="kSopGo('${k}')" class="relative text-left rounded-xl border border-border-subtle bg-white p-3 pl-4 hover:shadow-md transition overflow-hidden flex flex-col justify-between min-h-[92px]"><span class="absolute left-0 top-0 bottom-0 w-1.5" style="background:${c}"></span><span class="text-[11px] font-bold uppercase tracking-wide text-text-secondary">${i + 1}. ${l}</span><span class="flex items-end justify-between mt-2"><span class="text-3xl font-extrabold text-text-primary leading-none">${n(k)}</span><span class="text-[10px] text-text-muted">${tot ? Math.round(n(k) / tot * 100) : 0}%</span></span></button>`;
+          const bar = tot ? `<div class="flex h-2.5 rounded-full overflow-hidden bg-slate-100 mb-3">${st.map(([k, l, c]) => n(k) ? `<span title="${l}: ${n(k)}" style="width:${n(k) / tot * 100}%;background:${c}"></span>` : '').join('')}</div>` : '';
+          const alertT = (k, l, ic, c) => `<button onclick="kSopGo('${k}')" class="flex items-center gap-3 rounded-xl p-3 text-left hover:shadow-md transition border" style="background:${c}0f;border-color:${c}40"><span class="material-symbols-outlined text-[22px]" style="color:${c}">${ic}</span><span class="flex-1 text-xs font-bold text-text-primary">${l}</span><span class="text-xl font-extrabold" style="color:${c}">${n(k)}</span></button>`;
+          const ev = minggu.map(k => `<li class="py-2.5 flex gap-3 items-start"><span class="text-[11px] font-bold text-primary bg-surface-container-low rounded-lg px-2 py-1 shrink-0 text-center min-w-[78px]">${kFmtDate(k.tanggal)}</span><div class="min-w-0"><p class="text-xs font-semibold text-text-primary">${k.nama}</p>${k.keterangan ? `<p class="text-[11px] text-text-muted">${k.keterangan}</p>` : ''}</div></li>`).join('');
+          const why = s => s.can_act ? ['Menunggu tindakan Anda', '#2563eb'] : s.status === 'Rejected' ? ['Perlu direvisi', '#f97316'] : s.kadaluarsa ? ['Kadaluarsa', '#ef4444'] : null;
+          const att = it.filter(why).slice(0, 6).map(s => { const [t, c] = why(s); return `<li><button onclick="kSopPreview('${s.id}')" class="w-full text-left py-2.5 flex items-start gap-3 hover:bg-surface-container-low rounded-lg px-1"><span class="w-2 h-2 rounded-full mt-1.5 shrink-0" style="background:${c}"></span><span class="min-w-0 flex-1"><span class="block text-xs font-semibold text-text-primary truncate">${s.judul}</span><span class="block text-[10px] text-text-muted">${s.unit}</span></span><span class="text-[10px] font-bold shrink-0" style="color:${c}">${t}</span></button></li>`; }).join('');
+          const panel = (t, ic, body) => `<div class="bg-surface-card rounded-2xl border border-border-subtle p-4 shadow-sm"><h3 class="font-bold text-sm text-text-primary mb-2 flex items-center gap-2"><span class="material-symbols-outlined text-primary text-[18px]">${ic}</span>${t}</h3>${body}</div>`;
+          kEl('k-home-body').innerHTML = `<p class="text-xs text-text-muted -mt-2 mb-3">Ringkasan dokumen SOP dan kegiatan Komite Mutu dan Keselamatan Pasien.</p>
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">${kpi('description', '#166534', tot, 'Total SOP', 'seluruh status')}${kpi('notification_important', '#2563eb', (res.stats || {}).menunggu_saya || 0, 'Menunggu Tindakan Anda', 'sesuai peran Anda')}${kpi('fact_check', '#d97706', sc + '%', 'Kelengkapan KARS', 'rata-rata semua SOP')}${kpi('event', '#7c3aed', minggu.length, 'Kegiatan 7 Hari', 'jadwal terdekat')}</div>
+            <div class="bg-surface-card rounded-2xl border border-border-subtle p-4 mt-4 shadow-sm"><div class="flex flex-wrap items-center justify-between gap-1 mb-3"><h3 class="font-bold text-sm text-text-primary flex items-center gap-2"><span class="material-symbols-outlined text-primary text-[18px]">account_tree</span>Alur Status SOP</h3><span class="text-[11px] text-text-muted">Ketuk untuk membuka Pustaka SOP dengan filter yang sama</span></div>${bar}
+              <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">${st.map(tile).join('')}</div>
+              <div class="grid sm:grid-cols-2 gap-2 mt-2">${alertT('Rejected', 'Revisi (dikembalikan ke unit)', 'edit_note', '#f97316')}${alertT('Kadaluarsa', 'Kadaluarsa / perlu ditinjau ulang', 'event_busy', '#ef4444')}</div></div>
+            <div class="grid lg:grid-cols-2 gap-4 mt-4">${panel('Perlu Perhatian', 'priority_high', att ? '<ul class="divide-y divide-border-subtle">' + att + '</ul>' : kEmpty('Tidak ada SOP yang perlu perhatian.'))}${panel('Kegiatan 7 Hari ke Depan', 'event_upcoming', ev ? '<ul class="divide-y divide-border-subtle">' + ev + '</ul>' : kEmpty('Tidak ada kegiatan terjadwal dalam 7 hari ke depan.'))}</div>`;
+        }, true);
       }, true);
     }
 
@@ -7132,14 +7146,6 @@ function kFilterDone(res) { if (res.success && res.filt) { K.filt = res.filt; kS
 function kFilterAdd(j) { const v = kVal('kf-' + j).trim(); if (!v) return; kCall('apiSopFilterSave', [j, v], kFilterDone, true); }
 function kFilterDel(j, i) { const n = kUnion(K.filt[j], [])[i]; if (n !== undefined) kCall('apiSopFilterDelete', [j, unesc(n)], kFilterDone, true); }
 function kSopGo(st) { K.sopGo = st; switchTab('sopall'); }
-function kHomeSop() {
-  kCall('apiSopLibrary', [], res => {
-    const box = kEl('k-home-sop'); if (!res.success || !box) return; const it = res.items || [];
-    const defs = [['', 'Semua SOP', 'bg-slate-200 text-slate-800'], ['Draft', 'Draft'], ['Substansi', 'Review Substansi'], ['Legalitas', 'Review Legalitas'], ['Rejected', 'Revisi'], ['Final', 'Final (Menunggu Direktur)'], ['Approved', 'Disetujui'], ['Kadaluarsa', 'Kadaluarsa', 'bg-red-100 text-red-700']];
-    box.innerHTML = '<div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">' + defs.map(([k, l, c]) => { const n = k === '' ? it.length : it.filter(s => k === 'Kadaluarsa' ? s.kadaluarsa : s.status === k).length;
-      return `<button onclick="kSopGo('${k}')" class="rounded-xl border border-border-subtle bg-white p-3 text-left hover:shadow-md transition"><p class="text-2xl font-extrabold text-text-primary leading-none">${n}</p><span class="inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-bold ${c || KS_BADGE[k]}">${l}</span></button>`; }).join('') + '</div>';
-  }, true);
-}
 </script>
   <div id="printArea"></div>
   <script>
