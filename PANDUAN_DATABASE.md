@@ -19,3 +19,9 @@ Atur: Execute as = Me, Who has access = Anyone. Salin URL yang berakhiran /exec.
 
 ## 4. Isi config.js di GitHub
 window.KMKP_API_URL = "URL_WEB_APP_/exec";
+
+## 5. Menu Pustaka SOP (baru)
+Salin ulang komite.gs dan api.gs dari folder apps-script/ ke project Apps Script, lalu:
+1. Run `isiSOPBawaan` SEKALI (memuat 11 SPO 2026 sebagai Draft; aman dijalankan ulang, tidak menggandakan).
+2. Deploy > Manage deployments > New version > Deploy.
+Kolom baru pada sheet SOP_Master (kategori, tgl_dibuat, tgl_berlaku, tgl_kadaluarsa, versi, pengesah, isi_json) ditambahkan otomatis.
