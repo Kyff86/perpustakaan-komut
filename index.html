@@ -2019,15 +2019,15 @@
             <span id="k-sop-count" class="text-[11px] text-text-muted"></span>
           </div>
           <div class="flex flex-wrap items-center gap-2">
-            <input id="k-sopall-q" type="search" oninput="kSopPubRender()" placeholder="Cari judul / nomor / ruangan..." class="px-3 py-1.5 text-xs rounded-lg border border-border-form bg-white w-56 max-w-full">
-            <select id="k-sopall-unit" onchange="kSopPubRender()" class="px-2 py-1.5 text-xs rounded-lg border border-border-form bg-white"><option value="">Semua ruangan</option></select>
-            <select id="k-sopall-kat" onchange="kSopPubRender()" class="px-2 py-1.5 text-xs rounded-lg border border-border-form bg-white"><option value="">Semua kategori</option></select>
-            <select id="k-sopall-st" onchange="kSopPubRender()" class="px-2 py-1.5 text-xs rounded-lg border border-border-form bg-white"><option value="">Semua status</option><option value="Draft">Draft</option><option value="Substansi">Review Substansi</option><option value="Legalitas">Review Legalitas</option><option value="Rejected">Revisi</option><option value="Final">Final (Menunggu Direktur)</option><option value="Approved">Disetujui</option><option value="Kadaluarsa">Kadaluarsa / perlu ditinjau</option></select>
+            <input id="k-sopall-q" type="search" oninput="kSopPubRender()" placeholder="Cari judul / nomor / ruangan..." class="px-3 py-1.5 text-xs rounded-lg border border-border-form bg-white w-full sm:w-56">
+            <select id="k-sopall-unit" onchange="kSopPubRender()" class="px-2 py-1.5 text-xs rounded-lg border border-border-form bg-white flex-1 min-w-[140px] sm:flex-none"><option value="">Semua ruangan</option></select>
+            <select id="k-sopall-kat" onchange="kSopPubRender()" class="px-2 py-1.5 text-xs rounded-lg border border-border-form bg-white flex-1 min-w-[140px] sm:flex-none"><option value="">Semua kategori</option></select>
+            <select id="k-sopall-st" onchange="kSopPubRender()" class="px-2 py-1.5 text-xs rounded-lg border border-border-form bg-white flex-1 min-w-[140px] sm:flex-none"><option value="">Semua status</option><option value="Draft">Draft</option><option value="Substansi">Review Substansi</option><option value="Legalitas">Review Legalitas</option><option value="Rejected">Revisi</option><option value="Final">Final (Menunggu Direktur)</option><option value="Approved">Disetujui</option><option value="Kadaluarsa">Kadaluarsa / perlu ditinjau</option></select>
             <label class="text-xs flex items-center gap-1"><input id="k-sopall-bm" type="checkbox" onchange="kSopPubRender()"> Tersimpan &#9733;</label>
             <button id="k-filt-btn" onclick="kFilterOpen()" class="hidden items-center gap-1 px-2 py-1.5 text-xs rounded-lg border border-primary text-primary font-semibold"><span class="material-symbols-outlined text-[15px]">tune</span>Kelola Filter</button>
             <label class="text-xs flex items-center gap-1"><input id="k-sopall-grp" type="checkbox" onchange="kSopPubRender()"> Per ruangan</label>
           </div>
-          <div id="k-sopall-body" class="bg-surface-card rounded-xl border border-border-subtle overflow-hidden"></div>
+          <div id="k-sopall-body"></div>
         </div>
         <!-- ===== MODUL PELAPORAN MUTU (E-Mutu) ===== -->
 <!-- TAB 1: DASHBOARD REKAP DATA MUTU -->
@@ -6764,7 +6764,9 @@
     function kHome() {
       kCall('apiKomiteHome', [], res => {
         if (!res.success) return;
-        const minggu = res.minggu || [];
+        kCall('apiKegList', [], kg => {
+        const kd = d => d.getFullYear() + '-' + kPad(d.getMonth() + 1) + '-' + kPad(d.getDate()), t0 = kd(new Date()), t1 = kd(new Date(Date.now() + 30 * 864e5));
+        const minggu = ((kg.success && kg.items) || []).filter(k => k.tanggal >= t0 && k.tanggal <= t1).sort((a, b) => a.tanggal < b.tanggal ? -1 : 1);
         kCall('apiSopLibrary', [], lib => {
           const it = lib.success ? (lib.items || []) : []; K.sopPub = it; if (lib.filt) K.filt = lib.filt;
           const n = k => k === 'Kadaluarsa' ? it.filter(s => s.kadaluarsa).length : it.filter(s => s.status === k).length, tot = it.length;
@@ -6779,11 +6781,12 @@
           const att = it.filter(why).slice(0, 6).map(s => { const [t, c] = why(s); return `<li><button onclick="kSopPreview('${s.id}')" class="w-full text-left py-2.5 flex items-start gap-3 hover:bg-surface-container-low rounded-lg px-1"><span class="w-2 h-2 rounded-full mt-1.5 shrink-0" style="background:${c}"></span><span class="min-w-0 flex-1"><span class="block text-xs font-semibold text-text-primary truncate">${s.judul}</span><span class="block text-[10px] text-text-muted">${s.unit}</span></span><span class="text-[10px] font-bold shrink-0" style="color:${c}">${t}</span></button></li>`; }).join('');
           const panel = (t, ic, body) => `<div class="bg-surface-card rounded-2xl border border-border-subtle p-4 shadow-sm"><h3 class="font-bold text-sm text-text-primary mb-2 flex items-center gap-2"><span class="material-symbols-outlined text-primary text-[18px]">${ic}</span>${t}</h3>${body}</div>`;
           kEl('k-home-body').innerHTML = `<p class="text-xs text-text-muted -mt-2 mb-3">Ringkasan dokumen SOP dan kegiatan Komite Mutu dan Keselamatan Pasien.</p>
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">${kpi('description', '#166534', tot, 'Total SOP', 'seluruh status')}${kpi('notification_important', '#2563eb', (res.stats || {}).menunggu_saya || 0, 'Menunggu Tindakan Anda', 'sesuai peran Anda')}${kpi('fact_check', '#d97706', sc + '%', 'Kelengkapan KARS', 'rata-rata semua SOP')}${kpi('event', '#7c3aed', minggu.length, 'Kegiatan 7 Hari', 'jadwal terdekat')}</div>
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">${kpi('description', '#166534', tot, 'Total SOP', 'seluruh status')}${kpi('notification_important', '#2563eb', (res.stats || {}).menunggu_saya || 0, 'Menunggu Tindakan Anda', 'sesuai peran Anda')}${kpi('fact_check', '#d97706', sc + '%', 'Kelengkapan KARS', 'rata-rata semua SOP')}${kpi('event', '#7c3aed', minggu.length, 'Kegiatan 1 Bulan', '30 hari ke depan')}</div>
             <div class="bg-surface-card rounded-2xl border border-border-subtle p-4 mt-4 shadow-sm"><div class="flex flex-wrap items-center justify-between gap-1 mb-3"><h3 class="font-bold text-sm text-text-primary flex items-center gap-2"><span class="material-symbols-outlined text-primary text-[18px]">account_tree</span>Alur Status SOP</h3><span class="text-[11px] text-text-muted">Ketuk untuk membuka Pustaka SOP dengan filter yang sama</span></div>${bar}
               <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">${st.map(tile).join('')}</div>
               <div class="grid sm:grid-cols-2 gap-2 mt-2">${alertT('Rejected', 'Revisi (dikembalikan ke unit)', 'edit_note', '#f97316')}${alertT('Kadaluarsa', 'Kadaluarsa / perlu ditinjau ulang', 'event_busy', '#ef4444')}</div></div>
-            <div class="grid lg:grid-cols-2 gap-4 mt-4">${panel('Perlu Perhatian', 'priority_high', att ? '<ul class="divide-y divide-border-subtle">' + att + '</ul>' : kEmpty('Tidak ada SOP yang perlu perhatian.'))}${panel('Kegiatan 7 Hari ke Depan', 'event_upcoming', ev ? '<ul class="divide-y divide-border-subtle">' + ev + '</ul>' : kEmpty('Tidak ada kegiatan terjadwal dalam 7 hari ke depan.'))}</div>`;
+            <div class="grid lg:grid-cols-2 gap-4 mt-4">${panel('Perlu Perhatian', 'priority_high', att ? '<ul class="divide-y divide-border-subtle">' + att + '</ul>' : kEmpty('Tidak ada SOP yang perlu perhatian.'))}${panel('Kegiatan 1 Bulan ke Depan', 'event_upcoming', ev ? '<ul class="divide-y divide-border-subtle max-h-96 overflow-auto">' + ev + '</ul>' : kEmpty('Tidak ada kegiatan terjadwal dalam 1 bulan ke depan.'))}</div>`;
+        }, true);
         }, true);
       }, true);
     }
@@ -6810,6 +6813,7 @@
       }
       const monthN = Object.keys(ev).filter(k => k.indexOf(pre) === 0).reduce((a, k) => a + ev[k].length, 0);
       const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'], sd = new Date(sel + 'T00:00:00');
+      const agenda = Object.keys(ev).filter(k => k.indexOf(pre) === 0).sort().map(d => ev[d].map(k => `<button onclick="kDayClick('${d}')" class="w-full text-left flex items-start gap-3 py-2 border-t border-border-subtle first:border-t-0 rounded-lg px-1 hover:bg-surface-container-low ${d === sel ? 'bg-surface-container-low' : ''}"><span class="text-[11px] font-bold text-primary bg-surface-container-low rounded-lg px-2 py-1 shrink-0 min-w-[56px] text-center">${Number(d.slice(8))} ${BLN_FULL[m].slice(0, 3)}</span><span class="min-w-0 flex-1 text-xs font-semibold text-text-primary">${k.nama}</span>${k.bukti_url ? '<span class="material-symbols-outlined text-[16px] text-green-600" title="Ada bukti">photo_camera</span>' : ''}</button>`).join('')).join('');
       const list = (ev[sel] || []).map(k => {
         const id = kDriveId(k.bukti_url), foto = k.bukti_url ? (id ? `<a href="${k.bukti_url}" target="_blank" rel="noopener" class="block mt-2"><img src="https://drive.google.com/thumbnail?id=${id}&sz=w800" alt="Bukti kegiatan" loading="lazy" onerror="this.parentNode.outerHTML='<a href=&quot;${k.bukti_url}&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot; class=&quot;inline-block mt-2 text-[11px] text-primary underline&quot;>Buka berkas bukti</a>'" class="w-full max-h-72 object-cover rounded-lg border border-border-subtle"></a>` : `<a href="${k.bukti_url}" target="_blank" rel="noopener" class="inline-block mt-2 text-[11px] text-primary underline">Buka berkas bukti</a>`) : '<p class="mt-2 text-[11px] text-text-muted italic">Belum ada bukti unggahan.</p>';
         return `<div class="rounded-xl border border-border-subtle bg-white p-4 shadow-sm"><div class="flex items-start gap-2"><span class="material-symbols-outlined text-primary text-[20px]">event_available</span><div class="min-w-0 flex-1"><p class="text-sm font-bold text-text-primary">${k.nama}</p>${k.keterangan ? `<p class="text-xs text-text-secondary mt-1 whitespace-pre-line">${k.keterangan}</p>` : ''}</div>${kW() ? `<div class="flex gap-2 shrink-0"><button onclick="kKegForm('${k.id}')" class="text-primary text-[11px] font-semibold">Ubah</button><button onclick="kKegDel('${k.id}')" class="text-error text-[11px] font-semibold">Hapus</button></div>` : ''}</div>${foto}</div>`;
@@ -6818,7 +6822,8 @@
         <div class="bg-surface-card rounded-2xl border border-border-subtle p-4 shadow-sm"><div class="grid grid-cols-7 gap-1 mb-2 text-center text-[10px] font-bold text-text-muted uppercase"><span>Sen</span><span>Sel</span><span>Rab</span><span>Kam</span><span>Jum</span><span class="text-red-600">Sab</span><span class="text-red-600">Min</span></div><div class="grid grid-cols-7 gap-1">${cells}</div>
           <div class="mt-3 pt-3 border-t border-border-subtle flex items-center justify-between text-[11px] text-text-muted"><span><i class="inline-block w-2 h-2 rounded-full bg-primary mr-1"></i>Ada kegiatan</span><span class="font-semibold text-text-primary">${monthN} kegiatan bulan ini</span></div></div>
         <div class="flex flex-col gap-3"><div class="rounded-2xl bg-gradient-to-r from-primary to-primary-container text-white p-4 flex flex-wrap items-center justify-between gap-2"><div><p class="text-[11px] uppercase tracking-wide opacity-80">${HARI[sd.getDay()]}</p><h3 class="font-display font-extrabold text-lg leading-tight">${kFmtDate(sel)}</h3>${KHOL[sel] ? `<p class="text-[11px] mt-0.5 opacity-90">${esc(KHOL[sel])}</p>` : ''}</div><div class="flex items-center gap-2"><span class="text-[11px] bg-white/20 rounded-full px-3 py-1 font-semibold">${(ev[sel] || []).length} kegiatan</span>${kW() ? `<button onclick="kKegForm(null,'${sel}')" class="bg-white text-primary px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">add</span>Tambah</button>` : ''}</div></div>
-          ${list || `<div class="rounded-xl border border-dashed border-border-subtle bg-white">${kEmpty('Tidak ada kegiatan pada tanggal ini.')}</div>`}</div></div>`;
+          ${list || `<div class="rounded-xl border border-dashed border-border-subtle bg-white">${kEmpty('Tidak ada kegiatan pada tanggal ini.')}</div>`}
+          <div class="bg-surface-card rounded-2xl border border-border-subtle p-4 shadow-sm"><h3 class="font-bold text-sm text-text-primary mb-2 flex items-center gap-2"><span class="material-symbols-outlined text-primary text-[18px]">calendar_month</span>Seluruh Kegiatan ${BLN_FULL[m]} ${y}</h3>${agenda || '<p class="text-xs text-text-muted py-2">Belum ada kegiatan pada bulan ini.</p>'}</div></div></div>`;
     }
     function kDayClick(key) { kCal.sel = key; kJadwalRender(); }
     function kKegForm(id, tgl) {
@@ -7047,17 +7052,20 @@ function kSopGaps(s) {
 }
 const kGapScore = s => { const g = kSopGaps(s); return [g.filter(x => x.ok).length, g.length]; };
 function kSopRow(s) {
-  const [a, b] = kGapScore(s), full = a === b;
-  const star = `<button type="button" onclick="kSopBm('${s.id}')" title="${s.bm ? 'Hapus bookmark' : 'Simpan ke bookmark'}" class="shrink-0 ${s.bm ? 'text-amber-500' : 'text-text-muted hover:text-amber-500'}"><span class="material-symbols-outlined text-[22px]" style="font-variation-settings:'FILL' ${s.bm ? 1 : 0}">star</span></button>`;
-  const exp = s.kadaluarsa ? '<span class="ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">Perlu ditinjau ulang</span>' : '';
-  return `<div class="flex flex-wrap items-start gap-3 p-3 border-t border-border-subtle first:border-t-0">${star}
-    <div class="min-w-0 flex-1 basis-64"><p class="text-xs font-semibold text-text-primary">${s.judul}${exp}</p>
-      <p class="text-[10px] text-text-muted mt-0.5">${s.kategori || 'Tanpa kategori'} &bull; ${s.unit}${s.nomor ? ' &bull; No. ' + s.nomor : ''}${s.versi ? ' &bull; v' + s.versi : ''}</p>
-      <p class="text-[10px] text-text-muted">Dibuat ${kD(s.tgl_dibuat)} &bull; Berlaku ${kD(s.tgl_berlaku)} &bull; Kadaluarsa ${kD(s.tgl_kadaluarsa)}</p></div>
-    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${KS_BADGE[s.status] || KS_BADGE.Draft}">${KS_LABEL[s.status] || s.status}</span>
-    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${full ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}" title="Kelengkapan sesuai ketentuan akreditasi">KARS ${a}/${b}</span>
-    <div class="flex gap-1 shrink-0"><button onclick="kSopPreview('${s.id}')" class="bg-primary text-white px-3 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[15px]">visibility</span>Preview</button>
-      <button onclick="kSopDownload('${s.id}')" class="border border-primary text-primary px-3 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[15px]">download</span>Unduh</button></div></div>`;
+  const [a, b] = kGapScore(s), pct = Math.round(a / b * 100), col = pct >= 90 ? '#16a34a' : pct >= 60 ? '#d97706' : '#dc2626';
+  const ac = { Draft: '#64748b', Substansi: '#f59e0b', Legalitas: '#0ea5e9', Final: '#6366f1', Approved: '#16a34a', Rejected: '#f97316' }[s.status] || '#64748b';
+  const star = `<button type="button" onclick="kSopBm('${s.id}')" title="${s.bm ? 'Hapus bookmark' : 'Simpan ke bookmark'}" class="shrink-0 -mt-1 -mr-1 p-1 ${s.bm ? 'text-amber-500' : 'text-text-muted hover:text-amber-500'}"><span class="material-symbols-outlined text-[24px]" style="font-variation-settings:'FILL' ${s.bm ? 1 : 0}">star</span></button>`;
+  const chip = (ic, t) => t ? `<span class="inline-flex items-center gap-1 bg-surface-container-low rounded-full px-2 py-0.5 text-[10px] text-text-secondary max-w-full"><span class="material-symbols-outlined text-[13px]">${ic}</span><span class="truncate">${t}</span></span>` : '';
+  const dt = (l, v, bad) => `<div class="rounded-lg px-2 py-1.5 ${bad ? 'bg-red-50' : 'bg-surface-container-low'}"><p class="text-[9px] uppercase tracking-wide ${bad ? 'text-red-600' : 'text-text-muted'}">${l}</p><p class="text-[11px] font-bold ${bad ? 'text-red-700' : 'text-text-primary'}">${kD(v)}</p></div>`;
+  return `<div class="bg-white rounded-2xl border border-border-subtle shadow-sm hover:shadow-md transition flex flex-col overflow-hidden"><span class="h-1.5" style="background:${ac}"></span>
+    <div class="p-4 flex flex-col gap-3 flex-1">
+      <div class="flex items-start justify-between gap-2"><div class="flex flex-wrap gap-1"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${KS_BADGE[s.status] || KS_BADGE.Draft}">${KS_LABEL[s.status] || s.status}</span>${s.kadaluarsa ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">Perlu ditinjau ulang</span>' : ''}</div>${star}</div>
+      <h3 class="text-sm font-bold text-text-primary leading-snug line-clamp-3 min-h-[3.2rem]">${s.judul}</h3>
+      <div class="flex flex-wrap gap-1">${chip('category', s.kategori || 'Tanpa kategori')}${chip('meeting_room', s.unit)}${chip('tag', (kPh(s.nomor) ? 'No. belum ada' : 'No. ' + s.nomor) + (s.versi ? ' • v' + s.versi : ''))}</div>
+      <div class="grid grid-cols-3 gap-1.5">${dt('Dibuat', s.tgl_dibuat)}${dt('Berlaku', s.tgl_berlaku)}${dt('Kadaluarsa', s.tgl_kadaluarsa, s.kadaluarsa)}</div>
+      <div><div class="flex items-center justify-between text-[10px] mb-1"><span class="text-text-muted">Kelengkapan KARS</span><span class="font-bold" style="color:${col}">${a}/${b} (${pct}%)</span></div><div class="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full" style="width:${pct}%;background:${col}"></div></div></div>
+    </div>
+    <div class="px-4 pb-4 flex gap-2"><button onclick="kSopPreview('${s.id}')" class="flex-1 bg-primary text-white py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1" style="color:#fff"><span class="material-symbols-outlined text-[16px]">visibility</span>Preview</button><button onclick="kSopDownload('${s.id}')" class="flex-1 border border-primary text-primary py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[16px]">download</span>Unduh</button></div></div>`;
 }
 function kSopPubRender() {
   const q = kVal('k-sopall-q').trim().toLowerCase(), u = kVal('k-sopall-unit'), kt = kVal('k-sopall-kat'), st = kVal('k-sopall-st');
@@ -7067,9 +7075,10 @@ function kSopPubRender() {
   kEl('k-filt-btn').classList.toggle('hidden', !kW()); kEl('k-filt-btn').classList.toggle('flex', kW());
   kEl('k-sop-count').textContent = rows.length + ' dari ' + K.sopPub.length + ' SOP';
   let h = '';
-  if (grp) { const by = {}; rows.forEach(s => { (by[s.unit] = by[s.unit] || []).push(s); }); h = Object.keys(by).map(un => `<div class="px-3 py-2 bg-surface-container-low text-[11px] font-bold text-primary">${un} (${by[un].length})</div>` + by[un].map(kSopRow).join('')).join(''); }
-  else h = rows.map(kSopRow).join('');
-  kEl('k-sopall-body').innerHTML = h || kEmpty('Tidak ada SOP pada filter ini.');
+  const G = 'grid gap-3 sm:grid-cols-2 xl:grid-cols-3';
+  if (grp) { const by = {}; rows.forEach(s => { (by[s.unit] = by[s.unit] || []).push(s); }); h = Object.keys(by).map(un => `<div class="mb-4"><div class="flex items-center gap-2 mb-2"><span class="material-symbols-outlined text-primary text-[18px]">meeting_room</span><h3 class="text-xs font-bold text-primary">${un}</h3><span class="text-[10px] bg-surface-container-low rounded-full px-2 py-0.5 text-text-muted">${by[un].length}</span></div><div class="${G}">${by[un].map(kSopRow).join('')}</div></div>`).join(''); }
+  else h = `<div class="${G}">${rows.map(kSopRow).join('')}</div>`;
+  kEl('k-sopall-body').innerHTML = rows.length ? h : `<div class="bg-white rounded-2xl border border-dashed border-border-subtle">${kEmpty('Tidak ada SOP pada filter ini.')}</div>`;
 }
 function kSopBm(id) {
   kCall('apiSopBookmark', [id], res => { if (!res.success) return; const s = K.sopPub.find(x => String(x.id) === String(id)); if (s) s.bm = !!res.bookmarked; kSopPubRender(); }, true);
