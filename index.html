@@ -466,7 +466,8 @@
     }
   </style>
 <style>
-    .admin-scroll{max-height:calc(100vh - 300px);min-height:200px;overflow:auto;scroll-behavior:smooth;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;border:1px solid #e2e8f0;border-radius:12px;background:#fff}
+    #tab-content-admin,#tab-content-admin>div{min-width:0;max-width:100%}
+    .admin-scroll{max-width:100%;max-height:calc(100vh - 300px);min-height:200px;overflow:auto;scroll-behavior:smooth;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;border:1px solid #e2e8f0;border-radius:12px;background:#fff}
     .admin-scroll thead th{position:sticky;top:0;z-index:2;background:#f1f5f9;white-space:nowrap}
     .admin-scroll td{word-break:break-word}
     @media(max-width:767px){
@@ -2492,7 +2493,7 @@
               <select id="af-ustatus" onchange="renderAdminUsers()" class="px-2 py-1.5 text-xs rounded-lg border border-border-form bg-white flex-1 min-w-[130px] sm:flex-none"><option value="">Semua status</option><option value="Approved">Disetujui</option><option value="Pending">Menunggu</option><option value="Rejected">Ditolak</option></select>
               <select id="af-uunit" onchange="renderAdminUsers()" class="px-2 py-1.5 text-xs rounded-lg border border-border-form bg-white flex-1 min-w-[130px] sm:flex-none"><option value="">Semua ruangan</option></select>
               <button type="button" onclick="adminFilterReset('u')" class="px-3 py-1.5 text-xs rounded-lg border border-primary text-primary font-semibold">Reset</button>
-              <span id="af-ucount" class="text-[11px] text-text-muted w-full sm:w-auto"></span>
+              <span id="af-ucount" class="text-[11px] text-text-muted basis-full sm:basis-auto sm:ml-auto"></span>
             </div>
             <div class="admin-scroll">
               <table class="rtable w-full text-left text-xs border-collapse">
@@ -2535,7 +2536,7 @@
               <select id="af-qtype" onchange="renderFormQuestionsAdmin()" class="px-2 py-1.5 text-xs rounded-lg border border-border-form bg-white flex-1 min-w-[130px] sm:flex-none"><option value="">Semua tipe</option></select>
               <select id="af-qreq" onchange="renderFormQuestionsAdmin()" class="px-2 py-1.5 text-xs rounded-lg border border-border-form bg-white flex-1 min-w-[130px] sm:flex-none"><option value="">Wajib & opsional</option><option value="1">Wajib diisi</option><option value="0">Opsional</option></select>
               <button type="button" onclick="adminFilterReset('q')" class="px-3 py-1.5 text-xs rounded-lg border border-primary text-primary font-semibold">Reset</button>
-              <span id="af-qcount" class="text-[11px] text-text-muted w-full sm:w-auto"></span>
+              <span id="af-qcount" class="text-[11px] text-text-muted basis-full sm:basis-auto sm:ml-auto"></span>
             </div>
             <div class="admin-scroll p-2">
               <div id="container-form-questions" class="space-y-2">
@@ -6335,32 +6336,33 @@
       rows.forEach(u => {
             const tr = document.createElement('tr');
             tr.className = "hover:bg-surface-row-alt transition";
-            const stColor = u.status === 'Approved' ? 'bg-status-approved-bg text-status-approved-text' : 'bg-status-pending-bg text-status-pending-text';
+            const stColor = u.status === 'Approved' ? 'bg-status-approved-bg text-status-approved-text' : (u.status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-status-pending-bg text-status-pending-text');
+            const stLabel = { Approved: 'Disetujui', Pending: 'Menunggu', Rejected: 'Ditolak' }[u.status] || esc(u.status);
             const isSelf = !!(currentUser && unesc(u.username).toLowerCase() === String(currentUser.username || '').toLowerCase());
             tr.innerHTML = `
-              <td data-label="Username" class="p-3 font-bold text-navy-deep">${esc(u.username)}</td>
-              <td data-label="Nama" class="p-3 font-semibold text-text-primary">${esc(u.nama)}</td>
+              <td data-label="Username" class="p-3 pl-4 font-bold text-navy-deep whitespace-nowrap">${esc(u.username)}</td>
+              <td data-label="Nama" class="p-3 font-semibold text-text-primary min-w-[150px]">${esc(u.nama)}</td>
               <td data-label="NIP" class="p-3 text-text-secondary whitespace-nowrap">${esc(u.nip || '-')}</td>
-              <td data-label="Unit" class="p-3">${esc(u.ruangan)}</td>
+              <td data-label="Unit" class="p-3 min-w-[110px]">${esc(u.ruangan)}</td>
               <td data-label="Peran" class="p-3">
-                <select ${isSelf ? 'disabled title="Gunakan menu Profil Saya"' : ''} onchange="updateUserRole('${esc(u.username)}', this.value)" class="border border-border-form rounded px-2 py-1 text-xs bg-white focus:outline-none w-full max-w-[220px]">
+                <select ${isSelf ? 'disabled title="Gunakan menu Profil Saya"' : ''} onchange="updateUserRole('${esc(u.username)}', this.value)" class="border border-border-form rounded px-2 py-1 text-xs bg-white focus:outline-none w-full min-w-[160px]">
                   <option value="Staf" ${u.role === 'Staf' ? 'selected' : ''}>Staf Pelapor</option>
-                  <option value="Karu" ${u.role === 'Karu' ? 'selected' : ''}>Kepala Ruangan (Karu)</option>
-                  <option value="Komite" ${u.role === 'Komite' ? 'selected' : ''}>Komite Mutu (KMKPRS)</option>
-                  <option value="KetuaKomite" ${u.role === 'KetuaKomite' ? 'selected' : ''}>Ketua Komite Mutu</option>
+                  <option value="Karu" ${u.role === 'Karu' ? 'selected' : ''}>Kepala Ruangan</option>
+                  <option value="Komite" ${u.role === 'Komite' ? 'selected' : ''}>Komite Mutu</option>
+                  <option value="KetuaKomite" ${u.role === 'KetuaKomite' ? 'selected' : ''}>Ketua Komite</option>
                   <option value="Manajemen" ${u.role === 'Manajemen' ? 'selected' : ''}>Manajemen RS</option>
                   <option value="Direktur" ${u.role === 'Direktur' ? 'selected' : ''}>Direktur RS</option>
-                  <option value="TU" ${u.role === 'TU' ? 'selected' : ''}>Bagian Hukum / Tata Usaha</option>
+                  <option value="TU" ${u.role === 'TU' ? 'selected' : ''}>Hukum / Tata Usaha</option>
                   <option value="Admin" ${u.role === 'Admin' ? 'selected' : ''}>Administrator</option>
                 </select>
               </td>
-              <td data-label="Status" class="p-3">
-                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${stColor}">${esc(u.status)}</span>
+              <td data-label="Status" class="p-3 whitespace-nowrap">
+                <span class="inline-block whitespace-nowrap px-2.5 py-0.5 rounded-full text-[10px] font-bold ${stColor}">${stLabel}</span>
               </td>
-              <td data-label="Aksi" class="p-3 text-center space-x-1">
-                <div class="flex flex-wrap gap-1 justify-center">${!isSelf && u.status !== 'Approved' ? `<button onclick="updateUserStatus('${esc(u.username)}', 'Approved')" class="bg-knc-green text-white px-2.5 py-1 rounded text-xs font-semibold hover:opacity-90">Setujui</button>` : ''}
-                ${!isSelf && u.status !== 'Rejected' ? `<button onclick="updateUserStatus('${esc(u.username)}', 'Rejected')" class="bg-error text-white px-2.5 py-1 rounded text-xs font-semibold hover:opacity-90">Tolak</button>` : ''}
-                ${isSelf ? '<span class="text-[10px] text-text-muted italic">Akun Anda</span>' : `<button type="button" data-un="${esc(u.username)}" onclick="editUser(this.dataset.un)" class="bg-navy-action text-white px-2.5 py-1 rounded text-xs font-semibold hover:opacity-90 inline-flex items-center gap-1"><span class="material-symbols-outlined text-[13px]">edit</span>Edit</button><button type="button" data-un="${esc(u.username)}" onclick="deleteUser(this.dataset.un)" class="bg-white text-error border border-error px-2.5 py-1 rounded text-xs font-semibold hover:bg-error-container/40 inline-flex items-center gap-1"><span class="material-symbols-outlined text-[13px]">delete</span>Hapus</button>`}
+              <td data-label="Aksi" class="p-3 md:min-w-[250px]">
+                <div class="flex flex-wrap md:flex-nowrap gap-1.5 justify-end">${!isSelf && u.status !== 'Approved' ? `<button onclick="updateUserStatus('${esc(u.username)}', 'Approved')" class="bg-knc-green text-white px-2.5 py-1 rounded text-xs font-semibold whitespace-nowrap hover:opacity-90">Setujui</button>` : ''}
+                ${!isSelf && u.status !== 'Rejected' ? `<button onclick="updateUserStatus('${esc(u.username)}', 'Rejected')" class="bg-error text-white px-2.5 py-1 rounded text-xs font-semibold whitespace-nowrap hover:opacity-90">Tolak</button>` : ''}
+                ${isSelf ? '<span class="text-[10px] text-text-muted italic">Akun Anda</span>' : `<button type="button" data-un="${esc(u.username)}" onclick="editUser(this.dataset.un)" class="bg-navy-action text-white px-2.5 py-1 rounded text-xs font-semibold whitespace-nowrap hover:opacity-90 inline-flex items-center gap-1"><span class="material-symbols-outlined text-[13px]">edit</span>Edit</button><button type="button" data-un="${esc(u.username)}" onclick="deleteUser(this.dataset.un)" class="bg-white text-error border border-error px-2.5 py-1 rounded text-xs font-semibold whitespace-nowrap hover:bg-error-container/40 inline-flex items-center gap-1"><span class="material-symbols-outlined text-[13px]">delete</span>Hapus</button>`}
               </div></td>
             `;
             tbody.appendChild(tr);
